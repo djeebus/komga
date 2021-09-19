@@ -483,7 +483,7 @@ class SeriesController(
   @PreAuthorize("hasRole('$ROLE_ADMIN')")
   @ResponseStatus(HttpStatus.ACCEPTED)
   fun analyze(@PathVariable seriesId: String) {
-    bookRepository.findAllIdsBySeriesId(seriesId).forEach {
+    bookRepository.findAllBySeriesId(seriesId).forEach {
       taskReceiver.analyzeBook(it, HIGH_PRIORITY)
     }
   }
@@ -492,7 +492,7 @@ class SeriesController(
   @PreAuthorize("hasRole('$ROLE_ADMIN')")
   @ResponseStatus(HttpStatus.ACCEPTED)
   fun refreshMetadata(@PathVariable seriesId: String) {
-    bookRepository.findAllIdsBySeriesId(seriesId).forEach {
+    bookRepository.findAllBySeriesId(seriesId).forEach {
       taskReceiver.refreshBookMetadata(it, priority = HIGH_PRIORITY)
       taskReceiver.refreshBookLocalArtwork(it, priority = HIGH_PRIORITY)
     }

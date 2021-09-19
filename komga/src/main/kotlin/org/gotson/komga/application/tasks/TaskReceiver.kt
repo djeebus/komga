@@ -1,6 +1,7 @@
 package org.gotson.komga.application.tasks
 
 import mu.KotlinLogging
+import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookMetadataPatchCapability
 import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.CopyMode
@@ -15,6 +16,7 @@ import org.gotson.komga.infrastructure.jms.QUEUE_TASKS
 import org.gotson.komga.infrastructure.jms.QUEUE_TASKS_TYPE
 import org.gotson.komga.infrastructure.jms.QUEUE_TYPE
 import org.gotson.komga.infrastructure.jms.QUEUE_UNIQUE_ID
+import org.gotson.komga.infrastructure.jooq.UnpagedSorted
 import org.springframework.data.domain.Sort
 import org.springframework.jms.core.JmsTemplate
 import org.springframework.stereotype.Service
@@ -51,50 +53,50 @@ class TaskReceiver(
   }
 
   fun analyzeUnknownAndOutdatedBooks(library: Library) {
-    bookRepository.findAllIds(
+    bookRepository.findAll(
       BookSearch(
         libraryIds = listOf(library.id),
         mediaStatus = listOf(Media.Status.UNKNOWN, Media.Status.OUTDATED)
       ),
-      Sort.by(Sort.Order.asc("seriesId"), Sort.Order.asc("number"))
+      UnpagedSorted(Sort.by(Sort.Order.asc("seriesId"), Sort.Order.asc("number")))
     ).forEach {
-      submitTask(Task.AnalyzeBook(it))
+      submitTask(Task.AnalyzeBook(it.id, groupId = it.seriesId))
     }
   }
 
   fun hashBooksWithoutHash(library: Library) {
     if (komgaProperties.fileHashing)
-      bookRepository.findAllIdsByLibraryIdAndWithEmptyHash(library.id).forEach {
-        submitTask(Task.HashBook(it, LOWEST_PRIORITY))
+      bookRepository.findAllByLibraryIdAndWithEmptyHash(library.id).forEach {
+        submitTask(Task.HashBook(it.id, LOWEST_PRIORITY, it.seriesId))
       }
   }
 
   fun convertBooksToCbz(library: Library, priority: Int = DEFAULT_PRIORITY) {
-    bookConverter.getConvertibleBookIds(library).forEach {
-      submitTask(Task.ConvertBook(it, priority))
+    bookConverter.getConvertibleBooks(library).forEach {
+      submitTask(Task.ConvertBook(it.id, priority, it.seriesId))
     }
   }
 
   fun repairExtensions(library: Library, priority: Int = DEFAULT_PRIORITY) {
-    bookConverter.getMismatchedExtensionBookIds(library).forEach {
-      submitTask(Task.RepairExtension(it, priority))
+    bookConverter.getMismatchedExtensionBooks(library).forEach {
+      submitTask(Task.RepairExtension(it.id, priority, it.seriesId))
     }
   }
 
-  fun analyzeBook(bookId: String, priority: Int = DEFAULT_PRIORITY) {
-    submitTask(Task.AnalyzeBook(bookId, priority))
+  fun analyzeBook(book: Book, priority: Int = DEFAULT_PRIORITY) {
+    submitTask(Task.AnalyzeBook(book.id, priority, book.seriesId))
   }
 
-  fun generateBookThumbnail(bookId: String, priority: Int = DEFAULT_PRIORITY) {
-    submitTask(Task.GenerateBookThumbnail(bookId, priority))
+  fun generateBookThumbnail(book: Book, priority: Int = DEFAULT_PRIORITY) {
+    submitTask(Task.GenerateBookThumbnail(book.id, priority, book.seriesId))
   }
 
   fun refreshBookMetadata(
-    bookId: String,
+    book: Book,
     capabilities: List<BookMetadataPatchCapability> = BookMetadataPatchCapability.values().toList(),
     priority: Int = DEFAULT_PRIORITY,
   ) {
-    submitTask(Task.RefreshBookMetadata(bookId, capabilities, priority))
+    submitTask(Task.RefreshBookMetadata(book.id, capabilities, priority, book.seriesId))
   }
 
   fun refreshSeriesMetadata(seriesId: String, priority: Int = DEFAULT_PRIORITY) {
@@ -105,8 +107,8 @@ class TaskReceiver(
     submitTask(Task.AggregateSeriesMetadata(seriesId, priority))
   }
 
-  fun refreshBookLocalArtwork(bookId: String, priority: Int = DEFAULT_PRIORITY) {
-    submitTask(Task.RefreshBookLocalArtwork(bookId, priority))
+  fun refreshBookLocalArtwork(book: Book, priority: Int = DEFAULT_PRIORITY) {
+    submitTask(Task.RefreshBookLocalArtwork(book.id, priority, book.seriesId))
   }
 
   fun refreshSeriesLocalArtwork(seriesId: String, priority: Int = DEFAULT_PRIORITY) {
@@ -128,6 +130,7 @@ class TaskReceiver(
         setStringProperty(QUEUE_TYPE, QUEUE_TASKS_TYPE)
         setStringProperty(QUEUE_UNIQUE_ID, task.uniqueId())
         setStringProperty(QUEUE_SUB_TYPE, task::class.simpleName)
+        task.groupId?.let { groupId -> setStringProperty("JMSXGroupID", groupId) }
       }
     }
   }

@@ -2,6 +2,7 @@ package org.gotson.komga.interfaces.rest
 
 import org.gotson.komga.application.tasks.HIGH_PRIORITY
 import org.gotson.komga.application.tasks.TaskReceiver
+import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.DirectoryNotFoundException
 import org.gotson.komga.domain.model.DuplicateNameException
 import org.gotson.komga.domain.model.Library
@@ -169,7 +170,7 @@ class LibraryController(
   @PreAuthorize("hasRole('$ROLE_ADMIN')")
   @ResponseStatus(HttpStatus.ACCEPTED)
   fun analyze(@PathVariable libraryId: String) {
-    bookRepository.findAllIdsByLibraryId(libraryId).forEach {
+    bookRepository.findAll(BookSearch(libraryIds = listOf(libraryId))).forEach {
       taskReceiver.analyzeBook(it, HIGH_PRIORITY)
     }
   }
@@ -178,7 +179,7 @@ class LibraryController(
   @PreAuthorize("hasRole('$ROLE_ADMIN')")
   @ResponseStatus(HttpStatus.ACCEPTED)
   fun refreshMetadata(@PathVariable libraryId: String) {
-    bookRepository.findAllIdsByLibraryId(libraryId).forEach {
+    bookRepository.findAll(BookSearch(libraryIds = listOf(libraryId))).forEach {
       taskReceiver.refreshBookMetadata(it, priority = HIGH_PRIORITY)
       taskReceiver.refreshBookLocalArtwork(it, priority = HIGH_PRIORITY)
     }

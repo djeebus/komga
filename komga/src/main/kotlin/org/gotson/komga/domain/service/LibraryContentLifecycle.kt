@@ -197,8 +197,8 @@ class LibraryContentLifecycle(
               bookRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, newSidecar.parentUrl)?.let { book ->
                 logger.info { "Sidecar changed on disk (${newSidecar.url}, refresh Book for ${newSidecar.type}: $book" }
                 when (newSidecar.type) {
-                  Sidecar.Type.ARTWORK -> taskReceiver.refreshBookLocalArtwork(book.id)
-                  Sidecar.Type.METADATA -> taskReceiver.refreshBookMetadata(book.id)
+                  Sidecar.Type.ARTWORK -> taskReceiver.refreshBookLocalArtwork(book)
+                  Sidecar.Type.METADATA -> taskReceiver.refreshBookMetadata(book)
                 }
               }
           }
@@ -335,7 +335,7 @@ class LibraryContentLifecycle(
                   title = if (deleted.titleLock) deleted.title else newlyAdded.title,
                 )
               )
-              if (!deleted.titleLock) taskReceiver.refreshBookMetadata(bookToAdd.id, listOf(BookMetadataPatchCapability.TITLE))
+              if (!deleted.titleLock) taskReceiver.refreshBookMetadata(bookToAdd, listOf(BookMetadataPatchCapability.TITLE))
             }
 
             // copy read progress

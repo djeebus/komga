@@ -32,6 +32,12 @@ class KomgaProperties {
 
   var lucene = Lucene()
 
+  @Positive
+  var taskConsumers: Int = 1
+
+  @Positive
+  var taskConsumersMax: Int = 1
+
   class RememberMe {
     @get:NotBlank
     var key: String? = null
