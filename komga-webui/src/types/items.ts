@@ -62,7 +62,11 @@ export class BookItem extends Item<BookDto> {
 
   title (): string {
     const m = this.item.metadata
-    return `${m.number} - ${m.title}`
+    if (this.item.series != null) {
+      return `${this.item.series.name}: #${m.number} - ${m.title}`
+    } else {
+      return `${m.number} - ${m.title}`
+    }
   }
 
   body (): string {

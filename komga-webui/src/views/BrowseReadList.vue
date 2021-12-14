@@ -15,6 +15,15 @@
 
       <v-spacer/>
 
+      <v-btn icon @click="toggleViewType">
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on }">
+            <v-icon v-on="on">mdi-view-list</v-icon>
+          </template>
+          <span>{{ $t('browse_readlist.toggle_view') }}</span>
+        </v-tooltip>
+      </v-btn>
+
       <v-btn icon @click="startEditElements" v-if="isAdmin">
         <v-tooltip bottom>
           <template v-slot:activator="{ on }">
@@ -108,7 +117,15 @@
 
       <v-divider class="my-3"/>
 
-      <item-browser
+      <item-browser v-if="!renderList"
+        :items.sync="books"
+        :selected.sync="selectedBooks"
+        :edit-function="editSingleBook"
+        :draggable="editElements"
+        :deletable="editElements"
+      />
+
+      <item-list v-if="renderList"
         :items.sync="books"
         :selected.sync="selectedBooks"
         :edit-function="editSingleBook"
@@ -123,6 +140,7 @@
 
 <script lang="ts">
 import ItemBrowser from '@/components/ItemBrowser.vue'
+import ItemList from '@/components/ItemList.vue'
 import ToolbarSticky from '@/components/bars/ToolbarSticky.vue'
 import {
   BOOK_CHANGED,
@@ -155,6 +173,7 @@ export default Vue.extend({
   components: {
     ToolbarSticky,
     ItemBrowser,
+    ItemList,
     ReadListActionsMenu,
     MultiSelectBar,
     FilterDrawer,
@@ -176,6 +195,7 @@ export default Vue.extend({
         library: [] as NameValue[],
         tag: [] as NameValue[],
       },
+      renderList: false,
     }
   },
   props: {
@@ -362,8 +382,12 @@ export default Vue.extend({
         }))
       })
 
-      this.books = (await this.$komgaReadLists.getBooks(readListId, {unpaged: true} as PageRequest, this.filters.library, replaceCompositeReadStatus(this.filters.readStatus), this.filters.tag, authorsFilter)).content
-      this.books.forEach((x: BookDto) => x.context = {origin: ContextOrigin.READLIST, id: readListId})
+      let books = (await this.$komgaReadLists.getBooks(readListId, {unpaged: true} as PageRequest, this.filters.library, replaceCompositeReadStatus(this.filters.readStatus), this.filters.tag, authorsFilter)).content
+      for (const x of books) {
+          x.context = {origin: ContextOrigin.READLIST, id: readListId}
+          x.series = await this.$komgaSeries.getOneSeries(x.seriesId)
+      }
+      this.books = books
       this.booksCopy = [...this.books]
       this.selectedBooks = []
     },
@@ -393,6 +417,9 @@ export default Vue.extend({
     },
     addToReadList() {
       this.$store.dispatch('dialogAddBooksToReadList', this.selectedBooks)
+    },
+    toggleViewType() {
+        this.renderList = !this.renderList
     },
     startEditElements() {
       this.filters = {}

@@ -1,5 +1,6 @@
 import {Context} from '@/types/context'
 import {CopyMode} from '@/types/enum-books'
+import { SeriesDto } from './komga-series'
 
 export interface BookDto {
   id: string,
@@ -18,6 +19,7 @@ export interface BookDto {
 
   // custom fields
   context: Context
+  series?: SeriesDto
 }
 
 export interface MediaDto {

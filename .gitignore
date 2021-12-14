@@ -18,6 +18,7 @@ node_modules
 *.trace.db
 
 ### SQLite databases
+/komga/bin
 *.sqlite
 *.sqlite-journal
 
