@@ -67,6 +67,9 @@ class ComicInfo {
   @JsonProperty(value = "Editor")
   var editor: String? = null
 
+  @JsonProperty(value = "Translator")
+  var translator: String? = null
+
   @JsonProperty(value = "Publisher")
   var publisher: String? = null
 
@@ -75,6 +78,9 @@ class ComicInfo {
 
   @JsonProperty(value = "Genre")
   var genre: String? = null
+
+  @JsonProperty(value = "Tags")
+  var tags: String? = null
 
   @JsonProperty(value = "Web")
   var web: String? = null

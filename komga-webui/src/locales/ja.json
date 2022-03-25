@@ -128,6 +128,7 @@
       "cycle_scale": "大きさを切り替える",
       "cycle_side_padding": "左右の余白を切り替える",
       "first_page": "最初のページ",
+      "fullscreen": "全画面表示/解除",
       "last_page": "最後のページ",
       "left_to_right": "左から右に",
       "menus": "メニュー",
@@ -151,9 +152,11 @@
     "file": "ファイル名",
     "format": "フォーマット",
     "isbn": "ISBN",
+    "links": "リンク集",
     "navigation_within_readlist": "この読書リスト内の一覧: {name}",
     "outdated_tooltip": "この本のファイルが変更されました。この本を再分析する必要があります",
     "read_book": "書籍を読む",
+    "read_incognito": "シークレットモードで読む",
     "size": "サイズ"
   },
   "browse_collection": {
@@ -187,6 +190,7 @@
     "dismiss": "却下",
     "download": "ダウンロード",
     "email": "メールアドレス",
+    "filename": "ファイル名",
     "filter_no_matches": "フィルタに一致するものはありません",
     "genre": "ジャンル",
     "go_to_library": "ライブラリへ移動",
@@ -213,6 +217,7 @@
     "tags": "タグ",
     "unavailable": "利用できません",
     "unlock_all": "全てアンロック",
+    "url": "URL",
     "use_filter_panel_to_change_filter": "フィルターパネルを使って有効なフィルタを変更する",
     "year": "年"
   },
@@ -406,13 +411,6 @@
       "dialog_title": "ユーザを編集",
       "label_roles_for": "{name} がもつ役割"
     },
-    "edit_user_shared_libraries": {
-      "button_cancel": "キャンセル",
-      "button_confirm": "変更を保存",
-      "dialog_title": "共有ライブラリを編集",
-      "field_all_libraries": "全ライブラリ",
-      "label_shared_with": "{name} と共有"
-    },
     "empty_trash": {
       "body": "デフォルトでは、メディアサーバーはメディアの情報をすぐには削除しません。これは、ドライブが一時的に切断された場合に役立ちます。ライブラリのゴミ箱を空にすると、見つからないメディアに関するすべての情報が削除されます。",
       "button_confirm": "空",
@@ -442,6 +440,11 @@
       "field_new_password_error": "新しいパスワードは必須です。",
       "field_repeat_password": "新しいパスワードを再入力",
       "field_repeat_password_error": "パスワードを一致させてください。"
+    },
+    "refresh_library_metadata": {
+      "body": "ライブラリ内のすべてのメディアファイルのメタデータを更新します。ライブラリのサイズによっては、時間がかかる場合があります。",
+      "button_confirm": "更新",
+      "title": "ライブラリのメタデータを更新する"
     },
     "series_picker": {
       "label_search_series": "シリーズを検索",
@@ -480,6 +483,12 @@
       "title": "書籍の検査",
       "title_comparison": "書籍の比較"
     }
+  },
+  "duplicate_pages": {
+    "action_ignore": "無視"
+  },
+  "duplicates": {
+    "title": "重複ファイル"
   },
   "enums": {
     "copy_mode": {
@@ -620,7 +629,6 @@
     "server_settings": "サーバ設定"
   },
   "settings_user": {
-    "edit_shared_libraries": "共有ライブラリの編集",
     "edit_user": "ユーザの編集",
     "role_administrator": "管理者",
     "role_user": "ユーザ"

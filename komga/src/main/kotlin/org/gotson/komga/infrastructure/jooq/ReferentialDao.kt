@@ -3,10 +3,10 @@ package org.gotson.komga.infrastructure.jooq
 import org.gotson.komga.domain.model.Author
 import org.gotson.komga.domain.persistence.ReferentialRepository
 import org.gotson.komga.infrastructure.datasource.SqliteUdfDataSource
-import org.gotson.komga.infrastructure.language.stripAccents
 import org.gotson.komga.jooq.Tables
 import org.gotson.komga.jooq.tables.records.BookMetadataAggregationAuthorRecord
 import org.gotson.komga.jooq.tables.records.BookMetadataAuthorRecord
+import org.gotson.komga.language.stripAccents
 import org.jooq.DSLContext
 import org.jooq.impl.DSL.noCondition
 import org.jooq.impl.DSL.select
@@ -20,7 +20,7 @@ import java.time.LocalDate
 
 @Component
 class ReferentialDao(
-  private val dsl: DSLContext
+  private val dsl: DSLContext,
 ) : ReferentialRepository {
 
   private val a = Tables.BOOK_METADATA_AUTHOR
@@ -35,6 +35,7 @@ class ReferentialDao(
   private val st = Tables.SERIES_METADATA_TAG
   private val cs = Tables.COLLECTION_SERIES
   private val rb = Tables.READLIST_BOOK
+  private val sl = Tables.SERIES_METADATA_SHARING
 
   override fun findAllAuthorsByName(search: String, filterOnLibraryIds: Collection<String>?): List<Author> =
     dsl.selectDistinct(a.NAME, a.ROLE)
@@ -151,7 +152,7 @@ class ReferentialDao(
       items,
       if (pageable.isPaged) PageRequest.of(pageable.pageNumber, pageable.pageSize, pageSort)
       else PageRequest.of(0, maxOf(count, 20), pageSort),
-      count.toLong()
+      count.toLong(),
     )
   }
 
@@ -214,7 +215,7 @@ class ReferentialDao(
       .union(
         select(st.TAG.`as`("tag"))
           .from(st)
-          .apply { filterOnLibraryIds?.let { leftJoin(s).on(st.SERIES_ID.eq(s.ID)).where(s.LIBRARY_ID.`in`(it)) } }
+          .apply { filterOnLibraryIds?.let { leftJoin(s).on(st.SERIES_ID.eq(s.ID)).where(s.LIBRARY_ID.`in`(it)) } },
       )
       .fetchSet(0, String::class.java)
       .sortedBy { it.stripAccents().lowercase() }
@@ -231,7 +232,7 @@ class ReferentialDao(
           .from(st)
           .leftJoin(s).on(st.SERIES_ID.eq(s.ID))
           .where(s.LIBRARY_ID.eq(libraryId))
-          .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } }
+          .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } },
       )
       .fetchSet(0, String::class.java)
       .sortedBy { it.stripAccents().lowercase() }
@@ -250,7 +251,7 @@ class ReferentialDao(
           .leftJoin(cs).on(st.SERIES_ID.eq(cs.SERIES_ID))
           .leftJoin(s).on(st.SERIES_ID.eq(s.ID))
           .where(cs.COLLECTION_ID.eq(collectionId))
-          .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } }
+          .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } },
       )
       .fetchSet(0, String::class.java)
       .sortedBy { it.stripAccents().lowercase() }
@@ -357,6 +358,30 @@ class ReferentialDao(
       .orderBy(sd.PUBLISHER.collate(SqliteUdfDataSource.collationUnicode3))
       .fetchSet(sd.PUBLISHER)
 
+  override fun findAllPublishers(filterOnLibraryIds: Collection<String>?, pageable: Pageable): Page<String> {
+    val query = dsl.selectDistinct(sd.PUBLISHER)
+      .from(sd)
+      .apply { filterOnLibraryIds?.let { leftJoin(s).on(sd.SERIES_ID.eq(s.ID)) } }
+      .where(sd.PUBLISHER.ne(""))
+      .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } }
+
+    val count = dsl.fetchCount(query)
+    val sort = sd.PUBLISHER.collate(SqliteUdfDataSource.collationUnicode3)
+
+    val items = query
+      .orderBy(sort)
+      .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+      .fetch(sd.PUBLISHER)
+
+    val pageSort = Sort.by("name")
+    return PageImpl(
+      items,
+      if (pageable.isPaged) PageRequest.of(pageable.pageNumber, pageable.pageSize, pageSort)
+      else PageRequest.of(0, maxOf(count, 20), pageSort),
+      count.toLong(),
+    )
+  }
+
   override fun findAllPublishersByLibrary(libraryId: String, filterOnLibraryIds: Collection<String>?): Set<String> =
     dsl.selectDistinct(sd.PUBLISHER)
       .from(sd)
@@ -439,15 +464,46 @@ class ReferentialDao(
       .orderBy(bma.RELEASE_DATE.desc())
       .fetchSet(bma.RELEASE_DATE)
 
+  override fun findAllSharingLabels(filterOnLibraryIds: Collection<String>?): Set<String> =
+    dsl.selectDistinct(sl.LABEL)
+      .from(sl)
+      .apply {
+        filterOnLibraryIds?.let {
+          leftJoin(s).on(sl.SERIES_ID.eq(s.ID))
+            .where(s.LIBRARY_ID.`in`(it))
+        }
+      }
+      .orderBy(sl.LABEL.collate(SqliteUdfDataSource.collationUnicode3))
+      .fetchSet(sl.LABEL)
+
+  override fun findAllSharingLabelsByLibrary(libraryId: String, filterOnLibraryIds: Collection<String>?): Set<String> =
+    dsl.selectDistinct(sl.LABEL)
+      .from(sl)
+      .leftJoin(s).on(sl.SERIES_ID.eq(s.ID))
+      .where(s.LIBRARY_ID.eq(libraryId))
+      .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } }
+      .orderBy(sl.LABEL.collate(SqliteUdfDataSource.collationUnicode3))
+      .fetchSet(sl.LABEL)
+
+  override fun findAllSharingLabelsByCollection(collectionId: String, filterOnLibraryIds: Collection<String>?): Set<String> =
+    dsl.selectDistinct(sl.LABEL)
+      .from(sl)
+      .leftJoin(cs).on(sl.SERIES_ID.eq(cs.SERIES_ID))
+      .apply { filterOnLibraryIds?.let { leftJoin(s).on(sl.SERIES_ID.eq(s.ID)) } }
+      .where(cs.COLLECTION_ID.eq(collectionId))
+      .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } }
+      .orderBy(sl.LABEL.collate(SqliteUdfDataSource.collationUnicode3))
+      .fetchSet(sl.LABEL)
+
   private fun BookMetadataAuthorRecord.toDomain(): Author =
     Author(
       name = name,
-      role = role
+      role = role,
     )
 
   private fun BookMetadataAggregationAuthorRecord.toDomain(): Author =
     Author(
       name = name,
-      role = role
+      role = role,
     )
 }

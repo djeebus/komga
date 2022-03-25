@@ -4,10 +4,9 @@ import mu.KotlinLogging
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.KomgaUser
 import org.gotson.komga.domain.persistence.BookRepository
-import org.gotson.komga.infrastructure.jms.QUEUE_SSE
-import org.gotson.komga.infrastructure.jms.QUEUE_SSE_SELECTOR
-import org.gotson.komga.infrastructure.jms.QUEUE_SUB_TYPE
+import org.gotson.komga.infrastructure.jms.JMS_PROPERTY_TYPE
 import org.gotson.komga.infrastructure.jms.QUEUE_TASKS
+import org.gotson.komga.infrastructure.jms.TOPIC_EVENTS
 import org.gotson.komga.infrastructure.jms.TOPIC_FACTORY
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
 import org.gotson.komga.infrastructure.web.toFilePath
@@ -19,8 +18,11 @@ import org.gotson.komga.interfaces.sse.dto.ReadListSseDto
 import org.gotson.komga.interfaces.sse.dto.ReadProgressSeriesSseDto
 import org.gotson.komga.interfaces.sse.dto.ReadProgressSseDto
 import org.gotson.komga.interfaces.sse.dto.SeriesSseDto
+import org.gotson.komga.interfaces.sse.dto.SessionExpiredDto
 import org.gotson.komga.interfaces.sse.dto.TaskQueueSseDto
 import org.gotson.komga.interfaces.sse.dto.ThumbnailBookSseDto
+import org.gotson.komga.interfaces.sse.dto.ThumbnailReadListSseDto
+import org.gotson.komga.interfaces.sse.dto.ThumbnailSeriesCollectionSseDto
 import org.gotson.komga.interfaces.sse.dto.ThumbnailSeriesSseDto
 import org.springframework.http.MediaType
 import org.springframework.jms.annotation.JmsListener
@@ -62,7 +64,7 @@ class SseController(
     if (emitters.isNotEmpty()) {
       val tasksCount = jmsTemplate.browse(QUEUE_TASKS) { _: Session, browser: QueueBrowser ->
         browser.enumeration.toList()
-          .groupingBy { (it as ObjectMessage).getStringProperty(QUEUE_SUB_TYPE) ?: "unknown" }
+          .groupingBy { (it as ObjectMessage).getStringProperty(JMS_PROPERTY_TYPE) ?: "unknown" }
           .eachCount()
       } ?: emptyMap()
 
@@ -70,12 +72,13 @@ class SseController(
     }
   }
 
-  @JmsListener(destination = QUEUE_SSE, selector = QUEUE_SSE_SELECTOR, containerFactory = TOPIC_FACTORY)
+  @JmsListener(destination = TOPIC_EVENTS, containerFactory = TOPIC_FACTORY)
   fun handleSseEvent(event: DomainEvent) {
     when (event) {
       is DomainEvent.LibraryAdded -> emitSse("LibraryAdded", LibrarySseDto(event.library.id))
       is DomainEvent.LibraryUpdated -> emitSse("LibraryChanged", LibrarySseDto(event.library.id))
       is DomainEvent.LibraryDeleted -> emitSse("LibraryDeleted", LibrarySseDto(event.library.id))
+      is DomainEvent.LibraryScanned -> Unit
 
       is DomainEvent.SeriesAdded -> emitSse("SeriesAdded", SeriesSseDto(event.series.id, event.series.libraryId))
       is DomainEvent.SeriesUpdated -> emitSse("SeriesChanged", SeriesSseDto(event.series.id, event.series.libraryId))
@@ -99,8 +102,17 @@ class SseController(
       is DomainEvent.ReadProgressSeriesChanged -> emitSse("ReadProgressSeriesChanged", ReadProgressSeriesSseDto(event.seriesId, event.userId), userIdOnly = event.userId)
       is DomainEvent.ReadProgressSeriesDeleted -> emitSse("ReadProgressSeriesDeleted", ReadProgressSeriesSseDto(event.seriesId, event.userId), userIdOnly = event.userId)
 
-      is DomainEvent.ThumbnailBookAdded -> emitSse("ThumbnailBookAdded", ThumbnailBookSseDto(event.thumbnail.bookId, bookRepository.getSeriesIdOrNull(event.thumbnail.bookId).orEmpty()))
-      is DomainEvent.ThumbnailSeriesAdded -> emitSse("ThumbnailSeriesAdded", ThumbnailSeriesSseDto(event.thumbnail.seriesId))
+      is DomainEvent.ThumbnailBookAdded -> emitSse("ThumbnailBookAdded", ThumbnailBookSseDto(event.thumbnail.bookId, bookRepository.getSeriesIdOrNull(event.thumbnail.bookId).orEmpty(), event.thumbnail.selected))
+      is DomainEvent.ThumbnailBookDeleted -> emitSse("ThumbnailBookDeleted", ThumbnailBookSseDto(event.thumbnail.bookId, bookRepository.getSeriesIdOrNull(event.thumbnail.bookId).orEmpty(), event.thumbnail.selected))
+      is DomainEvent.ThumbnailSeriesAdded -> emitSse("ThumbnailSeriesAdded", ThumbnailSeriesSseDto(event.thumbnail.seriesId, event.thumbnail.selected))
+      is DomainEvent.ThumbnailSeriesDeleted -> emitSse("ThumbnailSeriesDeleted", ThumbnailSeriesSseDto(event.thumbnail.seriesId, event.thumbnail.selected))
+      is DomainEvent.ThumbnailSeriesCollectionAdded -> emitSse("ThumbnailSeriesCollectionAdded", ThumbnailSeriesCollectionSseDto(event.thumbnail.collectionId, event.thumbnail.selected))
+      is DomainEvent.ThumbnailSeriesCollectionDeleted -> emitSse("ThumbnailSeriesCollectionDeleted", ThumbnailSeriesCollectionSseDto(event.thumbnail.collectionId, event.thumbnail.selected))
+      is DomainEvent.ThumbnailReadListAdded -> emitSse("ThumbnailReadListAdded", ThumbnailReadListSseDto(event.thumbnail.readListId, event.thumbnail.selected))
+      is DomainEvent.ThumbnailReadListDeleted -> emitSse("ThumbnailReadListDeleted", ThumbnailReadListSseDto(event.thumbnail.readListId, event.thumbnail.selected))
+
+      is DomainEvent.UserUpdated -> if (event.expireSession) emitSse("SessionExpired", SessionExpiredDto(event.user.id), userIdOnly = event.user.id)
+      is DomainEvent.UserDeleted -> emitSse("SessionExpired", SessionExpiredDto(event.user.id), userIdOnly = event.user.id)
     }
   }
 
@@ -116,7 +128,7 @@ class SseController(
             emitter.send(
               SseEmitter.event()
                 .name(name)
-                .data(data, MediaType.APPLICATION_JSON)
+                .data(data, MediaType.APPLICATION_JSON),
             )
           } catch (e: IOException) {
           }

@@ -9,7 +9,7 @@ import io.mockk.just
 import io.mockk.verify
 import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
-import org.gotson.komga.application.tasks.TaskReceiver
+import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.BookPage
 import org.gotson.komga.domain.model.CopyMode
 import org.gotson.komga.domain.model.KomgaUser
@@ -27,7 +27,7 @@ import org.gotson.komga.domain.persistence.MediaRepository
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.ReadProgressRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
-import org.gotson.komga.infrastructure.language.toIndexedMap
+import org.gotson.komga.language.toIndexedMap
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -66,7 +66,7 @@ class BookImporterTest(
   private val user2 = KomgaUser("user2@example.org", "", false)
 
   @MockkBean
-  private lateinit var mockTackReceiver: TaskReceiver
+  private lateinit var mockTackReceiver: TaskEmitter
 
   @BeforeAll
   fun init() {
@@ -357,7 +357,7 @@ class BookImporterTest(
             numberLock = true,
             numberSort = 100F,
             numberSortLock = true,
-          )
+          ),
         )
       }
 
@@ -449,8 +449,8 @@ class BookImporterTest(
         mediaRepository.update(
           media.copy(
             status = Media.Status.READY,
-            pages = (1..10).map { BookPage("$it", "image/jpeg") }
-          )
+            pages = (1..10).map { BookPage("$it", "image/jpeg") },
+          ),
         )
       }
 

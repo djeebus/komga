@@ -1,31 +1,29 @@
 package org.gotson.komga.domain.persistence
 
+import org.gotson.komga.domain.model.ContentRestrictions
 import org.gotson.komga.domain.model.ReadList
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface ReadListRepository {
-  fun findByIdOrNull(readListId: String): ReadList?
-
-  fun findAll(search: String? = null, pageable: Pageable): Page<ReadList>
+  /**
+   * Find one ReadList by [readListId],
+   * optionally with only bookIds filtered by the provided [filterOnLibraryIds] it not null.
+   */
+  fun findByIdOrNull(readListId: String, filterOnLibraryIds: Collection<String>? = null, restrictions: ContentRestrictions = ContentRestrictions()): ReadList?
 
   /**
-   * Find one ReadList by readListId,
-   * optionally with only bookIds filtered by the provided filterOnLibraryIds.
+   * Find all ReadList
+   * optionally with at least one Book belonging to the provided [belongsToLibraryIds] if not null,
+   * optionally with only bookIds filtered by the provided [filterOnLibraryIds] if not null.
    */
-  fun findByIdOrNull(readListId: String, filterOnLibraryIds: Collection<String>?): ReadList?
+  fun findAll(belongsToLibraryIds: Collection<String>? = null, filterOnLibraryIds: Collection<String>? = null, search: String? = null, pageable: Pageable, restrictions: ContentRestrictions = ContentRestrictions()): Page<ReadList>
 
   /**
-   * Find all ReadList with at least one Book belonging to the provided belongsToLibraryIds,
-   * optionally with only bookIds filtered by the provided filterOnLibraryIds.
+   * Find all ReadList that contains the provided [containsBookId],
+   * optionally with only bookIds filtered by the provided [filterOnLibraryIds] if not null.
    */
-  fun findAllByLibraryIds(belongsToLibraryIds: Collection<String>, filterOnLibraryIds: Collection<String>?, search: String? = null, pageable: Pageable): Page<ReadList>
-
-  /**
-   * Find all ReadList that contains the provided containsBookId,
-   * optionally with only bookIds filtered by the provided filterOnLibraryIds.
-   */
-  fun findAllContainingBookId(containsBookId: String, filterOnLibraryIds: Collection<String>?): Collection<ReadList>
+  fun findAllContainingBookId(containsBookId: String, filterOnLibraryIds: Collection<String>?, restrictions: ContentRestrictions = ContentRestrictions()): Collection<ReadList>
 
   fun findAllEmpty(): Collection<ReadList>
 
@@ -42,4 +40,6 @@ interface ReadListRepository {
   fun deleteAll()
 
   fun existsByName(name: String): Boolean
+
+  fun count(): Long
 }

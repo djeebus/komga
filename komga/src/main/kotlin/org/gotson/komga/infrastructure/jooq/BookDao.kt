@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.net.URL
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -29,6 +30,7 @@ class BookDao(
   private val m = Tables.MEDIA
   private val d = Tables.BOOK_METADATA
   private val r = Tables.READ_PROGRESS
+  private val l = Tables.LIBRARY
 
   private val sorts = mapOf(
     "createdDate" to b.CREATED_DATE,
@@ -43,7 +45,9 @@ class BookDao(
     dsl.selectFrom(b)
       .where(b.LIBRARY_ID.eq(libraryId).and(b.URL.eq(url.toString())))
       .and(b.DELETED_DATE.isNull)
-      .fetchOneInto(b)
+      .orderBy(b.LAST_MODIFIED_DATE.desc())
+      .fetchInto(b)
+      .firstOrNull()
       ?.toDomain()
 
   private fun findByIdOrNull(dsl: DSLContext, bookId: String): Book? =
@@ -123,7 +127,7 @@ class BookDao(
       items,
       if (pageable.isPaged) PageRequest.of(pageable.pageNumber, pageable.pageSize, pageSort)
       else PageRequest.of(0, maxOf(count.toInt(), 20), pageSort),
-      count
+      count,
     )
   }
 
@@ -200,29 +204,31 @@ class BookDao(
       .fetch(b.ID)
   }
 
-  override fun findAllIdsByLibraryIdAndMediaTypes(libraryId: String, mediaTypes: Collection<String>): Collection<String> =
-    dsl.select(b.ID)
+  override fun findAllByLibraryIdAndMediaTypes(libraryId: String, mediaTypes: Collection<String>): Collection<Book> =
+    dsl.select(*b.fields())
       .from(b)
       .leftJoin(m).on(b.ID.eq(m.BOOK_ID))
       .where(b.LIBRARY_ID.eq(libraryId))
       .and(m.MEDIA_TYPE.`in`(mediaTypes))
-      .fetch(b.ID)
+      .fetchInto(b)
+      .map { it.toDomain() }
 
-  override fun findAllIdsByLibraryIdAndMismatchedExtension(libraryId: String, mediaType: String, extension: String): Collection<String> =
-    dsl.select(b.ID)
+  override fun findAllByLibraryIdAndMismatchedExtension(libraryId: String, mediaType: String, extension: String): Collection<Book> =
+    dsl.select(*b.fields())
       .from(b)
       .leftJoin(m).on(b.ID.eq(m.BOOK_ID))
       .where(b.LIBRARY_ID.eq(libraryId))
       .and(m.MEDIA_TYPE.eq(mediaType))
       .and(b.URL.notLike("%.$extension"))
-      .fetch(b.ID)
+      .fetchInto(b)
+      .map { it.toDomain() }
 
-  override fun findAllIdsByLibraryIdAndWithEmptyHash(libraryId: String): Collection<String> =
-    dsl.select(b.ID)
-      .from(b)
+  override fun findAllByLibraryIdAndWithEmptyHash(libraryId: String): Collection<Book> =
+    dsl.selectFrom(b)
       .where(b.LIBRARY_ID.eq(libraryId))
       .and(b.FILE_HASH.eq(""))
-      .fetch(b.ID)
+      .fetchInto(b)
+      .map { it.toDomain() }
 
   @Transactional
   override fun insert(book: Book) {
@@ -246,7 +252,7 @@ class BookDao(
             b.LIBRARY_ID,
             b.SERIES_ID,
             b.DELETED_DATE,
-          ).values(null as String?, null, null, null, null, null, null, null, null, null)
+          ).values(null as String?, null, null, null, null, null, null, null, null, null),
         ).also { step ->
           chunk.forEach {
             step.bind(
@@ -310,6 +316,20 @@ class BookDao(
 
   override fun count(): Long = dsl.fetchCount(b).toLong()
 
+  override fun countGroupedByLibraryName(): Map<String, Int> =
+    dsl.select(l.NAME, DSL.count(b.ID))
+      .from(l)
+      .leftJoin(b).on(l.ID.eq(b.LIBRARY_ID))
+      .groupBy(l.NAME)
+      .fetchMap(l.NAME, DSL.count(b.ID))
+
+  override fun getFilesizeGroupedByLibraryName(): Map<String, BigDecimal> =
+    dsl.select(l.NAME, DSL.sum(b.FILE_SIZE))
+      .from(l)
+      .leftJoin(b).on(l.ID.eq(b.LIBRARY_ID))
+      .groupBy(l.NAME)
+      .fetchMap(l.NAME, DSL.sum(b.FILE_SIZE))
+
   private fun BookSearch.toCondition(): Condition {
     var c: Condition = DSL.trueCondition()
 
@@ -337,6 +357,6 @@ class BookDao(
       deletedDate = deletedDate,
       createdDate = createdDate.toCurrentTimeZone(),
       lastModifiedDate = lastModifiedDate.toCurrentTimeZone(),
-      number = number
+      number = number,
     )
 }

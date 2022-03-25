@@ -30,6 +30,12 @@ class ThumbnailBookDao(
       .fetchInto(tb)
       .map { it.toDomain() }
 
+  override fun findByIdOrNull(thumbnailId: String): ThumbnailBook? =
+    dsl.selectFrom(tb)
+      .where(tb.ID.eq(thumbnailId))
+      .fetchOneInto(tb)
+      ?.toDomain()
+
   override fun findSelectedByBookIdOrNull(bookId: String): ThumbnailBook? =
     dsl.selectFrom(tb)
       .where(tb.BOOK_ID.eq(bookId))
@@ -107,6 +113,6 @@ class ThumbnailBookDao(
       id = id,
       bookId = bookId,
       createdDate = createdDate,
-      lastModifiedDate = lastModifiedDate
+      lastModifiedDate = lastModifiedDate,
     )
 }

@@ -3,6 +3,7 @@ package org.gotson.komga.infrastructure.jooq
 import org.gotson.komga.domain.model.Series
 import org.gotson.komga.domain.model.SeriesSearch
 import org.gotson.komga.domain.persistence.SeriesRepository
+import org.gotson.komga.infrastructure.datasource.SqliteUdfDataSource
 import org.gotson.komga.jooq.Tables
 import org.gotson.komga.jooq.tables.records.SeriesRecord
 import org.jooq.Condition
@@ -23,6 +24,7 @@ class SeriesDao(
   private val s = Tables.SERIES
   private val d = Tables.SERIES_METADATA
   private val cs = Tables.COLLECTION_SERIES
+  private val l = Tables.LIBRARY
 
   override fun findAll(): Collection<Series> =
     dsl.selectFrom(s)
@@ -57,7 +59,9 @@ class SeriesDao(
     dsl.selectFrom(s)
       .where(s.LIBRARY_ID.eq(libraryId).and(s.URL.eq(url.toString())))
       .and(s.DELETED_DATE.isNull)
-      .fetchOneInto(s)
+      .orderBy(s.LAST_MODIFIED_DATE.desc())
+      .fetchInto(s)
+      .firstOrNull()
       ?.toDomain()
 
   override fun findAllByTitle(title: String): Collection<Series> =
@@ -133,6 +137,13 @@ class SeriesDao(
 
   override fun count(): Long = dsl.fetchCount(s).toLong()
 
+  override fun countGroupedByLibraryName(): Map<String, Int> =
+    dsl.select(l.NAME, DSL.count(s.ID))
+      .from(l)
+      .leftJoin(s).on(l.ID.eq(s.LIBRARY_ID))
+      .groupBy(l.NAME)
+      .fetchMap(l.NAME, DSL.count(s.ID))
+
   private fun SeriesSearch.toCondition(): Condition {
     var c: Condition = DSL.trueCondition()
 
@@ -141,7 +152,7 @@ class SeriesDao(
     searchTerm?.let { c = c.and(d.TITLE.containsIgnoreCase(it)) }
     searchRegex?.let { c = c.and((it.second.toColumn()).likeRegex(it.first)) }
     if (!metadataStatus.isNullOrEmpty()) c = c.and(d.STATUS.`in`(metadataStatus))
-    if (!publishers.isNullOrEmpty()) c = c.and(DSL.lower(d.PUBLISHER).`in`(publishers.map { it.lowercase() }))
+    if (!publishers.isNullOrEmpty()) c = c.and(d.PUBLISHER.collate(SqliteUdfDataSource.collationUnicode3).`in`(publishers))
     if (deleted == true) c = c.and(s.DELETED_DATE.isNotNull)
     if (deleted == false) c = c.and(s.DELETED_DATE.isNull)
 
@@ -165,6 +176,6 @@ class SeriesDao(
       bookCount = bookCount,
       deletedDate = deletedDate,
       createdDate = createdDate.toCurrentTimeZone(),
-      lastModifiedDate = lastModifiedDate.toCurrentTimeZone()
+      lastModifiedDate = lastModifiedDate.toCurrentTimeZone(),
     )
 }

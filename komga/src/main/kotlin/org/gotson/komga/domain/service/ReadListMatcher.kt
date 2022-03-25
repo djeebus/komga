@@ -9,7 +9,7 @@ import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
-import org.gotson.komga.infrastructure.language.toIndexedMap
+import org.gotson.komga.language.toIndexedMap
 import org.springframework.stereotype.Service
 
 private val logger = KotlinLogging.logger {}
@@ -55,13 +55,13 @@ class ReadListMatcher(
     return if (bookIds.isNotEmpty())
       ReadListRequestResult(
         readList = ReadList(name = request.name, bookIds = bookIds.toIndexedMap()),
-        unmatchedBooks = unmatchedBooks
+        unmatchedBooks = unmatchedBooks,
       )
     else {
       ReadListRequestResult(
         readList = null,
         unmatchedBooks = unmatchedBooks,
-        errorCode = "ERR_1010"
+        errorCode = "ERR_1010",
       )
     }
   }

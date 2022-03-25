@@ -2,11 +2,12 @@ package org.gotson.komga.domain.service
 
 import mu.KotlinLogging
 import org.gotson.komga.application.events.EventPublisher
-import org.gotson.komga.application.tasks.TaskReceiver
+import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.CodedException
 import org.gotson.komga.domain.model.CopyMode
 import org.gotson.komga.domain.model.DomainEvent
+import org.gotson.komga.domain.model.HistoricalEvent
 import org.gotson.komga.domain.model.Media
 import org.gotson.komga.domain.model.PathContainedInPath
 import org.gotson.komga.domain.model.Series
@@ -14,12 +15,13 @@ import org.gotson.komga.domain.model.Sidecar
 import org.gotson.komga.domain.model.withCode
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
+import org.gotson.komga.domain.persistence.HistoricalEventRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.MediaRepository
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.ReadProgressRepository
 import org.gotson.komga.domain.persistence.SidecarRepository
-import org.gotson.komga.infrastructure.language.toIndexedMap
+import org.gotson.komga.language.toIndexedMap
 import org.springframework.stereotype.Service
 import java.io.FileNotFoundException
 import java.nio.file.FileAlreadyExistsException
@@ -55,7 +57,8 @@ class BookImporter(
   private val libraryRepository: LibraryRepository,
   private val sidecarRepository: SidecarRepository,
   private val eventPublisher: EventPublisher,
-  private val taskReceiver: TaskReceiver,
+  private val taskEmitter: TaskEmitter,
+  private val historicalEventRepository: HistoricalEventRepository,
 ) {
 
   fun importBook(sourceFile: Path, series: Series, copyMode: CopyMode, destinationName: String? = null, upgradeBookId: String? = null): Book {
@@ -68,12 +71,12 @@ class BookImporter(
 
       val destFile = series.path.resolve(
         if (destinationName != null) Paths.get("$destinationName.${sourceFile.extension}").name
-        else sourceFile.name
+        else sourceFile.name,
       )
       val sidecars = fileSystemScanner.scanBookSidecars(sourceFile).associateWith {
         series.path.resolve(
           if (destinationName != null) it.url.toURI().toPath().name.replace(sourceFile.nameWithoutExtension, destinationName, true)
-          else it.url.toURI().toPath().name
+          else it.url.toURI().toPath().name,
         )
       }
 
@@ -90,6 +93,7 @@ class BookImporter(
           logger.info { "Deleting existing file: ${bookToUpgrade.path}" }
           try {
             bookToUpgrade.path.deleteExisting()
+            historicalEventRepository.insert(HistoricalEvent.BookFileDeleted(bookToUpgrade, "File was deleted to import an upgrade"))
             deletedUpgradedFile = true
           } catch (e: NoSuchFileException) {
             logger.warn { "Could not delete upgraded book: ${bookToUpgrade.path}" }
@@ -159,7 +163,7 @@ class BookImporter(
             it.copy(
               bookId = importedBook.id,
               status = Media.Status.OUTDATED,
-            )
+            ),
           )
         }
 
@@ -178,14 +182,16 @@ class BookImporter(
           .forEach { rl ->
             readListRepository.update(
               rl.copy(
-                bookIds = rl.bookIds.values.map { if (it == bookToUpgrade.id) importedBook.id else it }.toIndexedMap()
-              )
+                bookIds = rl.bookIds.values.map { if (it == bookToUpgrade.id) importedBook.id else it }.toIndexedMap(),
+              ),
             )
           }
 
         // delete upgraded book file on disk if it has not been replaced earlier
-        if (!deletedUpgradedFile && bookToUpgrade.path.deleteIfExists())
+        if (!deletedUpgradedFile && bookToUpgrade.path.deleteIfExists()) {
           logger.info { "Deleted existing file: ${bookToUpgrade.path}" }
+          historicalEventRepository.insert(HistoricalEvent.BookFileDeleted(bookToUpgrade, "File was deleted to import an upgrade"))
+        }
 
         // delete upgraded book
         bookLifecycle.deleteOne(bookToUpgrade)
@@ -195,17 +201,18 @@ class BookImporter(
 
       sidecars.forEach { (sourceSidecar, destPath) ->
         when (sourceSidecar.type) {
-          Sidecar.Type.ARTWORK -> taskReceiver.refreshBookLocalArtwork(importedBook.id)
-          Sidecar.Type.METADATA -> taskReceiver.refreshBookMetadata(importedBook.id)
+          Sidecar.Type.ARTWORK -> taskEmitter.refreshBookLocalArtwork(importedBook)
+          Sidecar.Type.METADATA -> taskEmitter.refreshBookMetadata(importedBook)
         }
         val destSidecar = sourceSidecar.copy(
           url = destPath.toUri().toURL(),
           parentUrl = destPath.parent.toUri().toURL(),
-          lastModifiedTime = destPath.readAttributes<BasicFileAttributes>().getUpdatedTime()
+          lastModifiedTime = destPath.readAttributes<BasicFileAttributes>().getUpdatedTime(),
         )
         sidecarRepository.save(importedBook.libraryId, destSidecar)
       }
 
+      historicalEventRepository.insert(HistoricalEvent.BookImported(importedBook, series, sourceFile, upgradeBookId != null))
       eventPublisher.publishEvent(DomainEvent.BookImported(importedBook, sourceFile.toUri().toURL(), success = true))
 
       return importedBook

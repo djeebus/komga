@@ -23,7 +23,7 @@
   },
   "authentication_activity": {
     "datetime": "Fecha y Hora",
-    "email": "Correo",
+    "email": "Correo electrónico",
     "error": "Error",
     "ip": "IP",
     "source": "Fuente",
@@ -128,6 +128,7 @@
       "cycle_scale": "Cambiar escalado de página",
       "cycle_side_padding": "Cambiar el borde lateral",
       "first_page": "Primera página",
+      "fullscreen": "Entrar/salir pantalla completa",
       "last_page": "Última página",
       "left_to_right": "Izquierda a Derecha",
       "menus": "Menús",
@@ -151,6 +152,7 @@
     "file": "ARCHIVO",
     "format": "FORMATO",
     "isbn": "ISBN",
+    "links": "ENLACES",
     "navigation_within_readlist": "Navegación en la lista: {name}",
     "outdated_tooltip": "El archivo de este libro ha cambiado, este libro debe volver a analizarse",
     "read_book": "Leer libro",
@@ -407,13 +409,6 @@
       "dialog_title": "Editar usuario",
       "label_roles_for": "Funciones para {name}"
     },
-    "edit_user_shared_libraries": {
-      "button_cancel": "Cancelar",
-      "button_confirm": "Guardar cambios",
-      "dialog_title": "Editar bibliotecas compartidas",
-      "field_all_libraries": "Todas las bibliotecas",
-      "label_shared_with": "Compartida con {name}"
-    },
     "empty_trash": {
       "body": "De forma predeterminada, el servidor de medios no elimina la información de los medios de inmediato. Esto ayuda si una unidad se desconecta temporalmente. Cuando vacía la papelera de una biblioteca, se elimina toda la información sobre los medios faltantes.",
       "button_confirm": "Vacío",
@@ -652,7 +647,6 @@
   },
   "settings_user": {
     "change_password": "Cambiar contraseña",
-    "edit_shared_libraries": "Editar bibliotecas compartidas",
     "edit_user": "Editar usuario",
     "latest_activity": "Última actividad: {date}",
     "no_recent_activity": "Sin actividad reciente",

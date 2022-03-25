@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.builders.WebSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter
+import org.springframework.security.core.session.SessionRegistry
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository
@@ -33,6 +34,7 @@ class SecurityConfiguration(
   private val oidcUserService: OAuth2UserService<OidcUserRequest, OidcUser>,
   private val sessionCookieName: String,
   private val userAgentWebAuthenticationDetailsSource: WebAuthenticationDetailsSource,
+  private val sessionRegistry: SessionRegistry,
   clientRegistrationRepository: InMemoryClientRegistrationRepository?,
 ) : WebSecurityConfigurerAdapter() {
 
@@ -42,38 +44,40 @@ class SecurityConfiguration(
     http
       .cors {}
       .csrf { it.disable() }
-
       .authorizeRequests {
         // restrict all actuator endpoints to ADMIN only
         it.requestMatchers(EndpointRequest.toAnyEndpoint()).hasRole(ROLE_ADMIN)
 
         // claim is unprotected
-        it.antMatchers(
+        it.mvcMatchers(
           "/api/v1/claim",
           "/api/v1/oauth2/providers",
           "/set-cookie",
         ).permitAll()
 
         // all other endpoints are restricted to authenticated users
-        it.antMatchers(
+        it.mvcMatchers(
           "/api/**",
           "/opds/**",
-          "/sse/**"
+          "/sse/**",
         ).hasRole(ROLE_USER)
       }
-
       .headers {
         it.cacheControl().disable() // headers are set in WebMvcConfiguration
       }
-
       .httpBasic {
         it.authenticationDetailsSource(userAgentWebAuthenticationDetailsSource)
       }
-
       .logout {
-        it.logoutUrl("/api/v1/users/logout")
+        it.logoutUrl("/api/logout")
         it.deleteCookies(sessionCookieName)
         it.invalidateHttpSession(true)
+      }
+      .sessionManagement { session ->
+        session.sessionConcurrency {
+          it.sessionRegistry(sessionRegistry)
+          it.maximumSessions(-1)
+        }
       }
 
     if (oauth2Enabled) {
@@ -106,7 +110,7 @@ class SecurityConfiguration(
               setTokenValiditySeconds(komgaProperties.rememberMe.validity.seconds.toInt())
               setAlwaysRemember(true)
               setAuthenticationDetailsSource(userAgentWebAuthenticationDetailsSource)
-            }
+            },
           )
         }
     }
@@ -114,7 +118,7 @@ class SecurityConfiguration(
 
   override fun configure(web: WebSecurity) {
     web.ignoring()
-      .antMatchers(
+      .mvcMatchers(
         "/error**",
         "/css/**",
         "/img/**",
@@ -129,7 +133,7 @@ class SecurityConfiguration(
         "/android-chrome-512x512.png",
         "/manifest.json",
         "/",
-        "/index.html"
+        "/index.html",
       )
   }
 }

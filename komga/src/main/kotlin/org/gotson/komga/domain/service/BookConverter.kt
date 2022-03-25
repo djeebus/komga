@@ -4,16 +4,23 @@ import mu.KotlinLogging
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.io.FilenameUtils
+import org.gotson.komga.application.events.EventPublisher
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookConversionException
 import org.gotson.komga.domain.model.BookWithMedia
+import org.gotson.komga.domain.model.DomainEvent
+import org.gotson.komga.domain.model.HistoricalEvent
 import org.gotson.komga.domain.model.Library
 import org.gotson.komga.domain.model.Media
 import org.gotson.komga.domain.model.MediaNotReadyException
+import org.gotson.komga.domain.model.MediaType
 import org.gotson.komga.domain.model.MediaUnsupportedException
+import org.gotson.komga.domain.model.restoreHashFrom
 import org.gotson.komga.domain.persistence.BookRepository
+import org.gotson.komga.domain.persistence.HistoricalEventRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.MediaRepository
+import org.gotson.komga.language.notEquals
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.io.FileNotFoundException
@@ -39,39 +46,50 @@ class BookConverter(
   private val mediaRepository: MediaRepository,
   private val libraryRepository: LibraryRepository,
   private val transactionTemplate: TransactionTemplate,
+  private val eventPublisher: EventPublisher,
+  private val historicalEventRepository: HistoricalEventRepository,
 ) {
 
-  private val convertibleTypes = listOf("application/x-rar-compressed; version=4")
+  private val convertibleTypes = listOf(MediaType.RAR_4.value)
 
-  private val mediaTypeToExtension = mapOf(
-    "application/x-rar-compressed; version=4" to "cbr",
-    "application/zip" to "cbz",
-    "application/epub+zip" to "epub",
-    "application/pdf" to "pdf",
-  )
+  private val mediaTypeToExtension =
+    listOf(MediaType.RAR_4, MediaType.ZIP, MediaType.PDF, MediaType.EPUB)
+      .associate { it.value to it.fileExtension }
 
   private val failedConversions = mutableListOf<String>()
   private val skippedRepairs = mutableListOf<String>()
 
-  fun getConvertibleBookIds(library: Library): Collection<String> =
-    bookRepository.findAllIdsByLibraryIdAndMediaTypes(library.id, convertibleTypes)
+  fun getConvertibleBooks(library: Library): Collection<Book> =
+    if (library.convertToCbz)
+      bookRepository.findAllByLibraryIdAndMediaTypes(library.id, convertibleTypes)
+        .also { logger.info { "Found ${it.size} books to convert" } }
+    else {
+      logger.info { "CBZ conversion is not enabled, skipping" }
+      emptyList()
+    }
 
   fun convertToCbz(book: Book) {
+    // perform various checks
     if (!libraryRepository.findById(book.libraryId).convertToCbz)
       return logger.info { "Book conversion is disabled for the library, it may have changed since the task was submitted, skipping" }
 
     if (failedConversions.contains(book.id))
       return logger.info { "Book conversion already failed before, skipping" }
 
-    if (book.path.notExists()) throw FileNotFoundException("File not found: ${book.path}")
+    fileSystemScanner.scanFile(book.path)?.let { scannedBook ->
+      if (scannedBook.fileLastModified.notEquals(book.fileLastModified))
+        return logger.info { "Book has changed on disk, skipping" }
+    } ?: throw FileNotFoundException("File not found: ${book.path}")
 
     val media = mediaRepository.findById(book.id)
 
     if (!convertibleTypes.contains(media.mediaType))
       throw MediaUnsupportedException("${media.mediaType} cannot be converted. Must be one of $convertibleTypes")
+
     if (media.status != Media.Status.READY)
       throw MediaNotReadyException()
 
+    // perform conversion
     val destinationFilename = "${book.path.nameWithoutExtension}.$CBZ_EXTENSION"
     val destinationPath = book.path.parent.resolve(destinationFilename)
     if (destinationPath.exists())
@@ -92,22 +110,23 @@ class BookConverter(
         }
     }
 
+    // perform checks on new file
     val convertedBook = fileSystemScanner.scanFile(destinationPath)
       ?.copy(
         id = book.id,
         seriesId = book.seriesId,
-        libraryId = book.libraryId
+        libraryId = book.libraryId,
       )
       ?: throw IllegalStateException("Newly converted book could not be scanned: $destinationFilename")
 
-    val convertedMedia = bookAnalyzer.analyze(convertedBook)
+    val convertedMedia = bookAnalyzer.analyze(convertedBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
 
     try {
       when {
         convertedMedia.status != Media.Status.READY
         -> throw BookConversionException("Converted file could not be analyzed, aborting conversion")
 
-        convertedMedia.mediaType != "application/zip"
+        convertedMedia.mediaType != MediaType.ZIP.value
         -> throw BookConversionException("Converted file is not a zip file, aborting conversion")
 
         !convertedMedia.pages.map { FilenameUtils.getName(it.fileName) to it.mediaType }
@@ -124,18 +143,25 @@ class BookConverter(
       throw e
     }
 
-    if (book.path.deleteIfExists())
-      logger.info { "Deleted converted file: ${book.path}" }
+    if (book.path.deleteIfExists()) {
+      logger.info { "Deleted old file: ${book.path}" }
+      historicalEventRepository.insert(HistoricalEvent.BookFileDeleted(book, "File was deleted after conversion to CBZ"))
+    }
+
+    val mediaWithHashes = convertedMedia.copy(pages = convertedMedia.pages.restoreHashFrom(media.pages))
 
     transactionTemplate.executeWithoutResult {
       bookRepository.update(convertedBook)
-      mediaRepository.update(convertedMedia)
+      mediaRepository.update(mediaWithHashes)
     }
+
+    historicalEventRepository.insert(HistoricalEvent.BookConverted(convertedBook, book))
+    eventPublisher.publishEvent(DomainEvent.BookUpdated(convertedBook))
   }
 
-  fun getMismatchedExtensionBookIds(library: Library): Collection<String> =
+  fun getMismatchedExtensionBooks(library: Library): Collection<Book> =
     mediaTypeToExtension.flatMap { (mediaType, extension) ->
-      bookRepository.findAllIdsByLibraryIdAndMismatchedExtension(library.id, mediaType, extension)
+      bookRepository.findAllByLibraryIdAndMismatchedExtension(library.id, mediaType, extension)
     }
 
   fun repairExtension(book: Book) {
@@ -172,7 +198,7 @@ class BookConverter(
       ?.copy(
         id = book.id,
         seriesId = book.seriesId,
-        libraryId = book.libraryId
+        libraryId = book.libraryId,
       )
       ?: throw IllegalStateException("Repaired book could not be scanned: $destinationFilename")
 

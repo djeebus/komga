@@ -5,6 +5,7 @@ export interface SeriesDto {
   libraryId: string,
   name: string,
   url: string,
+  created: string,
   lastModified: string,
   booksCount: number,
   booksReadCount: number,
@@ -40,6 +41,8 @@ export interface SeriesMetadataDto {
   tagsLock: boolean,
   totalBookCount?: number,
   totalBookCountLock: boolean,
+  sharingLabels: string[],
+  sharingLabelsLock: boolean,
 }
 
 export interface SeriesBooksMetadataDto {
@@ -75,6 +78,8 @@ export interface SeriesMetadataUpdateDto {
   tagsLock?: boolean,
   totalBookCount?: number,
   totalBookCountLock: boolean,
+  sharingLabels?: string[],
+  sharingLabelsLock: boolean,
 }
 
 export interface GroupCountDto {

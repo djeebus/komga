@@ -50,24 +50,24 @@ const router = new Router({
       path: '/',
       name: 'home',
       redirect: {name: 'dashboard'},
-      component: () => import(/* webpackChunkName: "home" */ './views/Home.vue'),
+      component: () => import(/* webpackChunkName: "home" */ './views/HomeView.vue'),
       children: [
         {
           path: '/welcome',
           name: 'welcome',
-          component: () => import(/* webpackChunkName: "welcome" */ './views/Welcome.vue'),
+          component: () => import(/* webpackChunkName: "welcome" */ './views/WelcomeView.vue'),
         },
         {
           path: '/dashboard',
           name: 'dashboard',
           beforeEnter: noLibraryGuard,
-          component: () => import(/* webpackChunkName: "dashboard" */ './views/Dashboard.vue'),
+          component: () => import(/* webpackChunkName: "dashboard" */ './views/DashboardView.vue'),
         },
         {
           path: '/settings',
           name: 'settings',
-          redirect: {name: 'settings-analysis'},
-          component: () => import(/* webpackChunkName: "settings" */ './views/Settings.vue'),
+          redirect: {name: 'settings-users'},
+          component: () => import(/* webpackChunkName: "settings" */ './views/SettingsHolder.vue'),
           children: [
             {
               path: '/settings/users',
@@ -83,25 +83,65 @@ const router = new Router({
               ],
             },
             {
-              path: '/settings/analysis',
-              name: 'settings-analysis',
-              beforeEnter: adminGuard,
-              component: () => import(/* webpackChunkName: "settings-analysis" */ './views/SettingsMediaAnalysis.vue'),
-            },
-            {
               path: '/settings/server',
               name: 'settings-server',
               beforeEnter: adminGuard,
               component: () => import(/* webpackChunkName: "settings-server" */ './views/SettingsServer.vue'),
             },
             {
-              path: '/settings/data-import',
-              name: 'settings-data-import',
+              path: '/settings/metrics',
+              name: 'metrics',
               beforeEnter: adminGuard,
-              component: () => import(/* webpackChunkName: "settings-data-import" */ './views/SettingsDataImport.vue'),
+              component: () => import(/* webpackChunkName: "metrics" */ './views/Metrics.vue'),
             },
           ],
         },
+        {
+          path: '/media-management',
+          name: 'media-management',
+          redirect: {name: 'media-analysis'},
+          component: () => import(/* webpackChunkName: "media-management" */ './views/MediaManagement.vue'),
+          children: [
+            {
+              path: '/media-management/analysis',
+              name: 'media-analysis',
+              beforeEnter: adminGuard,
+              component: () => import(/* webpackChunkName: "media-analysis" */ './views/MediaAnalysis.vue'),
+            },
+            {
+              path: '/media-management/duplicate-files',
+              name: 'duplicate-files',
+              beforeEnter: adminGuard,
+              component: () => import(/* webpackChunkName: "duplicate-files" */ './views/DuplicateFiles.vue'),
+            },
+            {
+              path: '/media-management/duplicate-pages',
+              name: 'duplicate-pages',
+              redirect: {name: 'settings-duplicate-pages-known'},
+              component: () => import(/* webpackChunkName: "duplicate-pages" */ './views/DuplicatePagesHolder.vue'),
+              children: [
+                {
+                  path: '/media-management/duplicate-pages/known',
+                  name: 'settings-duplicate-pages-known',
+                  beforeEnter: adminGuard,
+                  component: () => import(/* webpackChunkName: "duplicate-pages" */ './views/DuplicatePagesKnown.vue'),
+                },
+                {
+                  path: '/media-management/duplicate-pages/unknown',
+                  name: 'settings-duplicate-pages-unknown',
+                  beforeEnter: adminGuard,
+                  component: () => import(/* webpackChunkName: "duplicate-pages" */ './views/DuplicatePagesUnknown.vue'),
+                },
+              ],
+            },
+          ],
+        },
+        {
+          path: '/history',
+          name: 'history',
+          component: () => import(/* webpackChunkName: "history" */ './views/HistoryView.vue'),
+        },
+
         {
           path: '/account',
           name: 'account',
@@ -119,7 +159,7 @@ const router = new Router({
           path: '/libraries/:libraryId/recommended',
           name: 'recommended-libraries',
           beforeEnter: noLibraryGuard,
-          component: () => import(/* webpackChunkName: "dashboard" */ './views/Dashboard.vue'),
+          component: () => import(/* webpackChunkName: "dashboard" */ './views/DashboardView.vue'),
           props: (route) => ({libraryId: route.params.libraryId}),
         },
         {
@@ -170,25 +210,40 @@ const router = new Router({
         {
           path: '/search',
           name: 'search',
-          component: () => import(/* webpackChunkName: "search" */ './views/Search.vue'),
+          component: () => import(/* webpackChunkName: "search" */ './views/SearchView.vue'),
         },
         {
           path: '/import',
           name: 'import',
+          redirect: {name: 'import-books'},
           beforeEnter: adminGuard,
-          component: () => import(/* webpackChunkName: "book-import" */ './views/BookImport.vue'),
+          component: () => import(/* webpackChunkName: "import" */ './views/ImportHolder.vue'),
+          children: [
+            {
+              path: '/import/books',
+              name: 'import-books',
+              beforeEnter: adminGuard,
+              component: () => import(/* webpackChunkName: "import-books" */ './views/ImportBooks.vue'),
+            },
+            {
+              path: '/import/readlists',
+              name: 'import-readlists',
+              beforeEnter: adminGuard,
+              component: () => import(/* webpackChunkName: "import-readlists" */ './views/ImportReadLists.vue'),
+            },
+          ],
         },
       ],
     },
     {
       path: '/startup',
       name: 'startup',
-      component: () => import(/* webpackChunkName: "startup" */ './views/Startup.vue'),
+      component: () => import(/* webpackChunkName: "startup" */ './views/StartupView.vue'),
     },
     {
       path: '/login',
       name: 'login',
-      component: () => import(/* webpackChunkName: "login" */ './views/Login.vue'),
+      component: () => import(/* webpackChunkName: "login" */ './views/LoginView.vue'),
     },
     {
       path: '/book/:bookId/read',

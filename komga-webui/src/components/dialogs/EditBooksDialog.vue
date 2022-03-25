@@ -35,6 +35,14 @@
             <v-icon left class="hidden-xs-only">mdi-tag-multiple</v-icon>
             {{ $t('dialog.edit_books.tab_tags') }}
           </v-tab>
+          <v-tab class="justify-start" v-if="single">
+            <v-icon left class="hidden-xs-only">mdi-link</v-icon>
+            {{ $t('dialog.edit_books.tab_links') }}
+          </v-tab>
+          <v-tab class="justify-start" v-if="single">
+            <v-icon left class="hidden-xs-only">mdi-image</v-icon>
+            {{ $t('dialog.edit_books.tab_poster') }}
+          </v-tab>
 
           <!--  Tab: General  -->
           <v-tab-item v-if="single">
@@ -282,6 +290,108 @@
             </v-card>
           </v-tab-item>
 
+          <!--  Tab: Links  -->
+          <v-tab-item v-if="single">
+            <v-card flat min-height="100">
+              <v-container fluid>
+                <!-- Links -->
+                <v-form
+                  v-model="linksValid"
+                  ref="linksForm"
+                >
+                  <v-row
+                    v-for="(link, i) in form.links"
+                    :key="i"
+                  >
+                    <v-col cols="4" class="py-0">
+                      <v-text-field v-model="form.links[i].label"
+                                    :label="$t('dialog.edit_books.field_link_label')"
+                                    filled
+                                    dense
+                                    :rules="[linksLabelRules]"
+                                    @input="$v.form.links.$touch()"
+                                    @blur="$v.form.links.$touch()"
+                                    @change="form.linksLock = true"
+                      >
+                        <template v-slot:prepend>
+                          <v-icon :color="form.linksLock ? 'secondary' : ''"
+                                  @click="form.linksLock = !form.linksLock"
+                          >
+                            {{ form.linksLock ? 'mdi-lock' : 'mdi-lock-open' }}
+                          </v-icon>
+                        </template>
+                      </v-text-field>
+                    </v-col>
+
+                    <v-col cols="8" class="py-0">
+                      <v-text-field v-model="form.links[i].url"
+                                    :label="$t('dialog.edit_books.field_link_url')"
+                                    filled
+                                    dense
+                                    :rules="[linksUrlRules]"
+                                    @input="$v.form.links.$touch()"
+                                    @blur="$v.form.links.$touch()"
+                                    @change="form.linksLock = true"
+                      >
+                        <template v-slot:append-outer>
+                          <v-icon @click="form.links.splice(i, 1)">mdi-delete</v-icon>
+                        </template>
+                      </v-text-field>
+                    </v-col>
+                  </v-row>
+                </v-form>
+
+                <v-row>
+                  <v-spacer/>
+                  <v-col cols="auto">
+                    <v-btn
+                      elevation="2"
+                      fab
+                      small
+                      bottom
+                      right
+                      color="primary"
+                      @click="form.links.push({label:'', url:''})"
+                    >
+                      <v-icon>mdi-plus</v-icon>
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-container>
+            </v-card>
+          </v-tab-item>
+
+          <!--  Tab: Thumbnails  -->
+          <v-tab-item v-if="single">
+            <v-card flat>
+              <v-container fluid>
+                <!-- Upload -->
+                <v-row>
+                  <v-col class="pa-1">
+                    <drop-zone ref="thumbnailsUpload" @on-input-change="addThumbnail" class="pa-8"/>
+                  </v-col>
+                </v-row>
+
+                <!-- Gallery -->
+                <v-row>
+                  <v-col
+                    cols="6" sm="4" lg="3" class="pa-1"
+                    v-for="(item, index) in [...poster.uploadQueue, ...poster.bookThumbnails]"
+                    :key="index"
+                  >
+                    <thumbnail-card
+                      :item="item"
+                      :selected="isThumbnailSelected(item)"
+                      :toBeDeleted="isThumbnailToBeDeleted(item)"
+                      @on-select-thumbnail="selectThumbnail"
+                      @on-delete-thumbnail="deleteThumbnail"
+                    />
+                  </v-col>
+                </v-row>
+
+              </v-container>
+            </v-card>
+          </v-tab-item>
         </v-tabs>
 
         <v-card-actions class="hidden-xs-only">
@@ -299,16 +409,19 @@ import {groupAuthorsByRole} from '@/functions/authors'
 import {authorRoles} from '@/types/author-roles'
 import Vue from 'vue'
 import {helpers, requiredIf} from 'vuelidate/lib/validators'
-import {BookDto} from '@/types/komga-books'
+import {BookDto, BookThumbnailDto} from '@/types/komga-books'
 import IsbnVerify from '@saekitominaga/isbn-verify'
 import {isMatch} from 'date-fns'
-import {ERROR} from '@/types/events'
+import {ERROR, ErrorEvent} from '@/types/events'
+import DropZone from '@/components/DropZone.vue'
+import ThumbnailCard from '@/components/ThumbnailCard.vue'
 
 const validDate = (value: string) => !helpers.req(value) || isMatch(value, 'yyyy-MM-dd')
 const validIsbn = (value: string) => !helpers.req(value) || new IsbnVerify(value).isIsbn13({check_digit: true})
 
 export default Vue.extend({
   name: 'EditBooksDialog',
+  components: {ThumbnailCard, DropZone},
   data: () => {
     return {
       modal: false,
@@ -316,6 +429,7 @@ export default Vue.extend({
       customRole: '',
       customRoles: [] as string[],
       customRoleValid: false,
+      linksValid: false,
       form: {
         title: '',
         titleLock: false,
@@ -333,6 +447,14 @@ export default Vue.extend({
         tagsLock: false,
         isbn: '',
         isbnLock: false,
+        links: [],
+        linksLock: false,
+      },
+      poster: {
+        selectedThumbnail: '',
+        uploadQueue: [] as File[],
+        deleteQueue: [] as BookThumbnailDto[],
+        bookThumbnails: [] as BookThumbnailDto[],
       },
       authorSearch: [],
       authorSearchResults: [] as string[],
@@ -351,7 +473,12 @@ export default Vue.extend({
       this.modal = val
     },
     modal(val) {
-      !val && this.dialogCancel()
+      if (val) {
+        this.getThumbnails(this.books)
+        this.loadAvailableTags()
+      } else {
+        this.dialogCancel()
+      }
     },
     books: {
       immediate: true,
@@ -389,10 +516,8 @@ export default Vue.extend({
       summary: {},
       authors: {},
       isbn: {validIsbn},
+      links: {},
     },
-  },
-  async created() {
-    this.tagsAvailable = await this.$komgaReferential.getTags()
   },
   computed: {
     authorRoles(): NameValue[] {
@@ -413,6 +538,7 @@ export default Vue.extend({
     authorSearchResultsFull(): string[] {
       // merge local values with server search, so that already input value is available
       const local = (this.$_.values(this.form.authors).flat()) as unknown as string[]
+      // eslint-disable-next-line vue/no-side-effects-in-computed-properties
       return this.$_.sortBy(this.$_.union(local, this.authorSearchResults), x => x.toLowerCase())
     },
     dialogTitle(): string {
@@ -433,12 +559,29 @@ export default Vue.extend({
       return errors
     },
     customRoleRules(): any[] {
-      if (this.customRole === '') return ['Must not be empty']
-      if (this.authorRoles.map(n => n.value.toLowerCase()).includes(this.customRole?.toLowerCase())) return ['Already exists']
+      if (this.customRole === '') return [this.$t('common.required').toString()]
+      if (this.authorRoles.map(n => n.value.toLowerCase()).includes(this.customRole?.toLowerCase())) return [this.$t('dialog.edit_books.add_author_role_error_duplicate').toString()]
       return [true]
     },
   },
   methods: {
+    async loadAvailableTags() {
+      this.tagsAvailable = await this.$komgaReferential.getTags()
+    },
+    linksLabelRules(label: string): boolean | string {
+      if (!!this.$_.trim(label)) return true
+      return this.$t('common.required').toString()
+    },
+    linksUrlRules(value: string): boolean | string {
+      let url
+      try {
+        url = new URL(value)
+      } catch (_) {
+        return this.$t('dialog.edit_books.field_link_url_error_url').toString()
+      }
+      if (url.protocol === 'http:' || url.protocol === 'https:') return true
+      return this.$t('dialog.edit_books.field_link_url_error_protocol').toString()
+    },
     addRole() {
       if ((this.$refs.customRoleForm as any).validate()) {
         this.customRoles.push(this.customRole.toLowerCase());
@@ -454,13 +597,15 @@ export default Vue.extend({
     },
     dialogReset(books: BookDto | BookDto[]) {
       this.tab = 0;
-      (this.$refs.customRoleForm as any)?.reset()
+      (this.$refs.customRoleForm as any)?.reset();
+      (this.$refs.linksForm as any)?.resetValidation()
       this.customRoles = []
       this.$v.$reset()
       if (Array.isArray(books) && books.length === 0) return
       else if (this.$_.isEmpty(books)) return
       if (Array.isArray(books) && books.length > 0) {
         this.form.authors = {}
+        this.form.links = []
 
         const authorsLock = this.$_.uniq(books.map(x => x.metadata.authorsLock))
         this.form.authorsLock = authorsLock.length > 1 ? false : authorsLock[0]
@@ -471,9 +616,14 @@ export default Vue.extend({
         this.form.tagsLock = tagsLock.length > 1 ? false : tagsLock[0]
       } else {
         this.form.tags = []
+        this.form.links = []
         const book = books as BookDto
         this.$_.merge(this.form, book.metadata)
         this.form.authors = groupAuthorsByRole(book.metadata.authors)
+        this.poster.selectedThumbnail = ''
+        this.poster.deleteQueue = []
+        this.poster.uploadQueue = []
+        this.poster.bookThumbnails = []
       }
     },
     dialogCancel() {
@@ -486,7 +636,7 @@ export default Vue.extend({
       }
     },
     validateForm(): any {
-      if (!this.$v.$invalid) {
+      if (!this.$v.$invalid && (!this.single || !this.$refs.linksForm || (this.$refs.linksForm as any).validate())) {
         const metadata = {
           authorsLock: this.form.authorsLock,
           tagsLock: this.form.tagsLock,
@@ -512,6 +662,7 @@ export default Vue.extend({
             summaryLock: this.form.summaryLock,
             releaseDateLock: this.form.releaseDateLock,
             isbnLock: this.form.isbnLock,
+            linksLock: this.form.linksLock,
           })
 
           if (this.$v.form?.title?.$dirty) {
@@ -537,6 +688,10 @@ export default Vue.extend({
           if (this.$v.form?.isbn?.$dirty) {
             this.$_.merge(metadata, {isbn: this.form.isbn})
           }
+
+          if (this.$v.form?.links?.$dirty || this.form.links.length != (this.books as BookDto).metadata.links?.length) {
+            this.$_.merge(metadata, {links: this.form.links})
+          }
         }
 
         return metadata
@@ -544,6 +699,36 @@ export default Vue.extend({
       return null
     },
     async editBooks(): Promise<boolean> {
+      if (this.single && this.poster.uploadQueue.length > 0) {
+        const book = this.books as BookDto
+        let hadErrors = false
+        for (const file of this.poster.uploadQueue.slice()) {
+          try {
+            await this.$komgaBooks.uploadThumbnail(book.id, file, file.name === this.poster.selectedThumbnail)
+            this.deleteThumbnail(file)
+          } catch (e) {
+            this.$eventHub.$emit(ERROR, {message: e.message} as ErrorEvent)
+            hadErrors = true
+          }
+        }
+        if (hadErrors) {
+          await this.getThumbnails(book)
+          return false
+        }
+      }
+
+      if (this.single && this.poster.selectedThumbnail !== '') {
+        const id = this.poster.selectedThumbnail
+        const book = this.books as BookDto
+        if (this.poster.bookThumbnails.find(value => value.id === id)) {
+          await this.$komgaBooks.markThumbnailAsSelected(book.id, id)
+        }
+      }
+
+      if (this.single && this.poster.deleteQueue.length > 0) {
+        this.poster.deleteQueue.forEach(toDelete => this.$komgaBooks.deleteThumbnail(toDelete.bookId, toDelete.id))
+      }
+
       const metadata = this.validateForm()
       if (metadata) {
         const toUpdate = (this.single ? [this.books] : this.books) as BookDto[]
@@ -556,6 +741,73 @@ export default Vue.extend({
         }
         return true
       } else return false
+    },
+    addThumbnail(files: File[]) {
+      let hasSelected = false
+      for (const file of files) {
+        if (!this.poster.uploadQueue.find(value => value.name === file.name)) {
+          this.poster.uploadQueue.push(file)
+          if (!hasSelected) {
+            this.selectThumbnail(file)
+            hasSelected = true
+          }
+        }
+      }
+
+      (this.$refs.thumbnailsUpload as any).reset()
+    },
+    async getThumbnails(book: BookDto | BookDto[]) {
+      if (Array.isArray(book)) return
+
+      const thumbnails = await this.$komgaBooks.getThumbnails(book.id)
+
+      this.selectThumbnail(thumbnails.find(x => x.selected))
+
+      this.poster.bookThumbnails = thumbnails
+    },
+    isThumbnailSelected(item: File | BookThumbnailDto): boolean {
+      return item instanceof File ? item.name === this.poster.selectedThumbnail : item.id === this.poster.selectedThumbnail
+    },
+    selectThumbnail(item: File | BookThumbnailDto | undefined) {
+      if (!item) {
+        return
+      } else if (item instanceof File) {
+        this.poster.selectedThumbnail = item.name
+      } else {
+        const index = this.poster.deleteQueue.indexOf(item, 0)
+        if (index > -1) this.poster.deleteQueue.splice(index, 1)
+
+        this.poster.selectedThumbnail = item.id
+      }
+    },
+    isThumbnailToBeDeleted(item: File | BookThumbnailDto) {
+      if (item instanceof File) {
+        return false
+      } else {
+        return this.poster.deleteQueue.includes(item)
+      }
+    },
+    deleteThumbnail(item: File | BookThumbnailDto) {
+      if (item instanceof File) {
+        const index = this.poster.uploadQueue.indexOf(item, 0)
+        if (index > -1) {
+          this.poster.uploadQueue.splice(index, 1)
+        }
+        if (item.name === this.poster.selectedThumbnail) {
+          this.poster.selectedThumbnail = ''
+        }
+      } else {
+        // if thumbnail was marked for deletion, unmark it
+        if (this.isThumbnailToBeDeleted(item)) {
+          const index = this.poster.deleteQueue.indexOf(item, 0)
+          if (index > -1) {
+            this.poster.deleteQueue.splice(index, 1)
+          }
+        } else {
+          this.poster.deleteQueue.push(item)
+          if (item.id === this.poster.selectedThumbnail) this.poster.selectedThumbnail = ''
+        }
+      }
     },
   },
 })

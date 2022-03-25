@@ -127,6 +127,7 @@
 
       <item-list v-if="renderList"
         :items.sync="books"
+        :item-context="[ItemContext.SHOW_SERIES]"
         :selected.sync="selectedBooks"
         :edit-function="editSingleBook"
         :draggable="editElements"
@@ -167,6 +168,7 @@ import {LibraryDto} from '@/types/komga-libraries'
 import {mergeFilterParams, toNameValue} from '@/functions/filter'
 import {Location} from 'vue-router'
 import {readListFileUrl} from '@/functions/urls'
+import {ItemContext} from '@/types/items'
 
 export default Vue.extend({
   name: 'BrowseReadList',
@@ -183,6 +185,7 @@ export default Vue.extend({
   },
   data: () => {
     return {
+      ItemContext,
       readList: undefined as ReadListDto | undefined,
       books: [] as BookDto[],
       booksCopy: [] as BookDto[],

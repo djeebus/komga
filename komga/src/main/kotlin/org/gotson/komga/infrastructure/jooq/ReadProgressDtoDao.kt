@@ -1,8 +1,8 @@
 package org.gotson.komga.infrastructure.jooq
 
-import org.gotson.komga.interfaces.rest.dto.TachiyomiReadProgressDto
-import org.gotson.komga.interfaces.rest.dto.TachiyomiReadProgressV2Dto
-import org.gotson.komga.interfaces.rest.persistence.ReadProgressDtoRepository
+import org.gotson.komga.interfaces.api.persistence.ReadProgressDtoRepository
+import org.gotson.komga.interfaces.api.rest.dto.TachiyomiReadProgressDto
+import org.gotson.komga.interfaces.api.rest.dto.TachiyomiReadProgressV2Dto
 import org.gotson.komga.jooq.Tables
 import org.jooq.AggregateFunction
 import org.jooq.Condition
@@ -15,7 +15,7 @@ import java.math.BigDecimal
 
 @Component
 class ReadProgressDtoDao(
-  private val dsl: DSLContext
+  private val dsl: DSLContext,
 ) : ReadProgressDtoRepository {
 
   private val rlb = Tables.READLIST_BOOK

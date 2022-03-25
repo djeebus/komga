@@ -21,15 +21,11 @@
 </template>
 
 <script lang="ts">
-import BookActionsMenu from '@/components/menus/BookActionsMenu.vue'
-import CollectionActionsMenu from '@/components/menus/CollectionActionsMenu.vue'
-import SeriesActionsMenu from '@/components/menus/SeriesActionsMenu.vue'
 import {getReadProgress, getReadProgressPercentage} from '@/functions/book-progress'
 import {ReadStatus} from '@/types/enum-books'
 import {createItem, Item, ItemTypes} from '@/types/items'
 import Vue from 'vue'
 import {RawLocation} from 'vue-router'
-import ReadListActionsMenu from '@/components/menus/ReadListActionsMenu.vue'
 import {BookDto} from '@/types/komga-books'
 import {SeriesDto} from '@/types/komga-series'
 import {THUMBNAILBOOK_ADDED, THUMBNAILSERIES_ADDED} from '@/types/events'
@@ -38,7 +34,6 @@ import {coverBase64} from '@/types/image'
 
 export default Vue.extend({
   name: 'ItemRow',
-  components: {BookActionsMenu, SeriesActionsMenu, CollectionActionsMenu, ReadListActionsMenu},
   props: {
     item: {
       type: Object as () => BookDto | SeriesDto | CollectionDto | ReadListDto,

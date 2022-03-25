@@ -5,10 +5,12 @@ import { SeriesDto } from './komga-series'
 export interface BookDto {
   id: string,
   seriesId: string,
+  seriesTitle: string,
   libraryId: string,
   name: string,
   url: string,
   number: number,
+  created: string,
   lastModified: string,
   sizeBytes: number,
   size: string,
@@ -35,6 +37,8 @@ export interface PageDto {
   mediaType: string,
   width?: number,
   height?: number,
+  sizeBytes?: number,
+  size: string,
 }
 
 export interface PageDtoWithUrl {
@@ -43,6 +47,8 @@ export interface PageDtoWithUrl {
   mediaType: string,
   width?: number,
   height?: number,
+  sizeBytes?: number,
+  size: string,
   url: string,
 }
 
@@ -65,6 +71,8 @@ export interface BookMetadataDto {
   tagsLock: boolean,
   isbn: string,
   isbnLock: boolean
+  links?: WebLinkDto[],
+  linksLock?: boolean
 }
 
 export interface ReadProgressDto {
@@ -90,16 +98,23 @@ export interface BookMetadataUpdateDto {
   tags?: string[],
   tagsLock?: boolean
   isbn?: string,
-  isbnLock?: boolean
+  isbnLock?: boolean,
+  links?: WebLinkDto[],
+  linksLock?: boolean
 }
 
 export interface BookMetadataUpdateBatchDto {
-  [bookId: string]: BookMetadataUpdateBatchDto
+  [bookId: string]: BookMetadataUpdateDto
 }
 
 export interface AuthorDto {
   name: string,
   role: string
+}
+
+export interface WebLinkDto {
+  label: string,
+  url: string
 }
 
 export interface ReadProgressUpdateDto {
@@ -112,7 +127,7 @@ export interface BookFormat {
   color: string
 }
 
-export interface BookImportBatchDto{
+export interface BookImportBatchDto {
   books: BookImportDto[],
   copyMode: CopyMode,
 }
@@ -122,4 +137,11 @@ export interface BookImportDto {
   seriesId: string,
   upgradeBookId?: string,
   destinationName?: string,
+}
+
+export interface BookThumbnailDto {
+  id: string,
+  bookId: string,
+  type: string,
+  selected: boolean
 }

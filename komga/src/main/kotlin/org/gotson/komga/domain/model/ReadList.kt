@@ -19,5 +19,5 @@ data class ReadList(
   /**
    * Indicates that the bookIds have been filtered and is not exhaustive.
    */
-  val filtered: Boolean = false
-) : Auditable(), Serializable
+  val filtered: Boolean = false,
+) : Auditable, Serializable

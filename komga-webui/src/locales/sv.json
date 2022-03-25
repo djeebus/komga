@@ -42,7 +42,9 @@
   },
   "book_card": {
     "error": "Fel",
+    "no_release_date": "Inget utgivningsdatum",
     "unknown": "Ska analyseras",
+    "unread": "Oläst",
     "unsupported": "Stödjs inte"
   },
   "book_import": {
@@ -128,6 +130,7 @@
       "cycle_scale": "Växla skala",
       "cycle_side_padding": "Växla sidofyllning",
       "first_page": "Första sidan",
+      "fullscreen": "Öppna/avsluta helskärm",
       "last_page": "Sista sidan",
       "left_to_right": "Vänster till höger",
       "menus": "Menyer",
@@ -151,6 +154,7 @@
     "file": "FIL",
     "format": "FORMAT",
     "isbn": "ISBN",
+    "links": "LÄNKAR",
     "navigation_within_readlist": "Navigering inom läslistan: {name}",
     "outdated_tooltip": "Filen för den här boken har ändrats, boken måste analyseras om",
     "read_book": "Läs bok",
@@ -176,6 +180,7 @@
     "title": "{name} samling"
   },
   "common": {
+    "age": "Ålder",
     "all_libraries": "Alla bibliotek",
     "books": "Böcker",
     "books_n": "Ingen bok | 1 bok | {count} böcker",
@@ -185,9 +190,11 @@
     "collections": "Samlingar",
     "create": "Skapa",
     "delete": "Redera",
+    "disk_space": "Diskutrymme",
     "dismiss": "Avfärda",
     "download": "Ladda ner",
     "email": "E-post",
+    "filename": "Filnamn",
     "filter_no_matches": "Det aktiva filtret ger ingen träff",
     "genre": "Genre",
     "go_to_library": "Gå till bibliotek",
@@ -200,6 +207,8 @@
     "n_selected": "{count} valda",
     "nothing_to_show": "Inget att visa",
     "outdated": "Föråldrad",
+    "page": "Sida",
+    "page_number": "Sidnummer",
     "pages": "sidor",
     "pages_n": "Inga sidor | 1 sida | {count} sidor",
     "password": "Lösenord",
@@ -210,10 +219,13 @@
     "required": "Krävs",
     "reset_filters": "Återställ filter",
     "roles": "Roller",
+    "save_changes": "Spara ändringar",
     "series": "Serier",
+    "sidecars": "Sidovagnar",
     "tags": "Taggar",
     "unavailable": "Otillgänglig",
     "unlock_all": "Lås upp alla",
+    "url": "URL",
     "use_filter_panel_to_change_filter": "Använd filterpanelen för att ändra det aktiva filtret",
     "year": "år"
   },
@@ -272,6 +284,15 @@
       "button_confirm": "Analysera",
       "title": "Analysera biblioteket"
     },
+    "delete_book": {
+      "button_confirm": "Ta bort",
+      "confirm_delete": "Ja, radera boken \"{name}\" och dess filer",
+      "confirm_delete_multiple": "Ja, ta bort {count} böcker och deras filer",
+      "dialog_title": "Ta bort bok",
+      "dialog_title_multiple": "Ta bort böcker",
+      "warning_html": "Boken <b>{name}</b> kommer att tas bort från denna server tillsammans med lagrade mediefiler. Detta <b> kan inte</b> ångras. Fortsätta?",
+      "warning_multiple_html": "{count} böcker kommer att tas bort från den här servern tillsammans med lagrade mediefiler. Detta <b> kan inte</b> ångras. Fortsätta?"
+    },
     "delete_collection": {
       "button_confirm": "Radera",
       "confirm_delete": "Ja, radera samlingen ”{name}”",
@@ -296,6 +317,14 @@
       "warning_html": "Läslistan <b>{name}</b> tas bort från den här servern. Dina mediefiler påverkas inte. Detta <b>kan inte</b> ångras. Fortsätta?",
       "warning_multiple_html": "{count} läslistor kommer att tas bort från denna server. Dina mediefiler påverkas inte. Denna <b> kan inte </b> ångras. Fortsätta?"
     },
+    "delete_series": {
+      "button_confirm": "Ta bort",
+      "confirm_delete": "Ja, radera serien \"{name}\" och dess filer",
+      "confirm_delete_multiple": "Ja, radera {count} serier och deras filer",
+      "dialog_title": "Ta bort serier",
+      "warning_html": "Serien <b>{name}</b> kommer att tas bort från den här servern tillsammans med lagrade mediefiler. Detta <b>kan inte</b> ångras. Fortsätta?",
+      "warning_multiple_html": "{count} serier kommer att tas bort från den här servern tillsammans med lagrade mediefiler. Detta <b> kan inte</b> ångras. Fortsätta?"
+    },
     "delete_user": {
       "button_confirm": "Radera",
       "confirm_delete": "Ja, radera användare ”{name}”",
@@ -303,6 +332,7 @@
       "warning_html": "Användaren <b>{name}</b> kommer att tas bort från den här servern. Detta <b>kan inte</b> ångras. Fortsätta?"
     },
     "edit_books": {
+      "add_author_role_error_duplicate": "Finns redan",
       "authors_notice_multiple_edit": "Du redigerar författare för flera böcker. Detta kommer att skriva över befintliga författare till varje bok.",
       "button_cancel": "Avbryt",
       "button_confirm": "Spara ändringar",
@@ -310,6 +340,10 @@
       "dialog_title_single": "Redigera {book}",
       "field_isbn": "ISBN",
       "field_isbn_error": "Måste vara ett giltigt ISBN 13",
+      "field_link_label": "Etikett",
+      "field_link_url": "URL",
+      "field_link_url_error_protocol": "Måste vara http eller https",
+      "field_link_url_error_url": "Måste vara en giltig URL",
       "field_number": "Nummer",
       "field_number_sort": "Sorteringsnummer",
       "field_number_sort_hint": "Du kan använda decimaltal",
@@ -320,6 +354,8 @@
       "field_title": "Titel",
       "tab_authors": "Författare",
       "tab_general": "Allmänt",
+      "tab_links": "Länkar",
+      "tab_poster": "Affisch",
       "tab_tags": "Taggar",
       "tags_notice_multiple_edit": "Du redigerar taggar för flera böcker. Detta skriver över befintliga taggar i varje bok."
     },
@@ -328,7 +364,9 @@
       "button_confirm": "Spara ändringar",
       "dialog_title": "Redigera samling",
       "field_manual_ordering": "Manuell sortering",
-      "label_ordering": "Som standard kommer serier i en samling att sorteras efter namn. Du kan aktivera manuell sortering för att definiera din egen sortering."
+      "label_ordering": "Som standard kommer serier i en samling att sorteras efter namn. Du kan aktivera manuell sortering för att definiera din egen sortering.",
+      "tab_general": "Allmänt",
+      "tab_poster": "Affisch"
     },
     "edit_library": {
       "button_browse": "Bläddra",
@@ -338,6 +376,9 @@
       "button_next": "Nästa",
       "dialog_title_add": "Lägg till bibliotek",
       "dialot_title_edit": "Lägg till bibliotek",
+      "field_analysis_analyze_dimensions": "Analysera sidornas dimensioner",
+      "field_analysis_hash_files": "Beräkna hash för filer",
+      "field_analysis_hash_pages": "Beräkna hash för sidor",
       "field_convert_to_cbz": "Konvertera automatiskt till CBZ",
       "field_import_barcode_isbn": "ISBN streckkod",
       "field_import_comicinfo_book": "Bok metadata",
@@ -357,6 +398,7 @@
       "field_series_cover": "Serieomslag",
       "file_browser_dialog_button_confirm": "Välj",
       "file_browser_dialog_title": "Bibliotekets rotkatalog",
+      "label_analysis": "Analys",
       "label_file_management": "Filhantering",
       "label_import_barcode_isbn": "Importera ISBN streckkod",
       "label_import_comicinfo": "Importera metadata för CBR/CBZ som innehåller en ComicInfo.xml-fil",
@@ -367,14 +409,18 @@
       "label_series_cover": "Serieomslag",
       "tab_general": "Allmänt",
       "tab_metadata": "Metadata",
-      "tab_options": "Alternativ"
+      "tab_options": "Alternativ",
+      "tooltip_scanner_force_modified_time": "Aktivera om biblioteket finns på en Google Drive",
+      "tooltip_use_resources": "Kan ta mycket resurser i anspråk på stora bibliotek eller långsam hårdvara"
     },
     "edit_readlist": {
       "button_cancel": "Avbryt",
       "button_confirm": "Spara ändringar",
       "dialog_title": "Redigera läslistan",
       "field_name": "Namn",
-      "field_summary": "Sammanfattning"
+      "field_summary": "Sammanfattning",
+      "tab_general": "Allmänt",
+      "tab_poster": "Affisch"
     },
     "edit_series": {
       "button_cancel": "Avbryt",
@@ -384,6 +430,7 @@
       "field_age_rating": "Åldersgräns",
       "field_age_rating_error": "Åldersgränsen måste vara 0 eller mer",
       "field_genres": "Genrer",
+      "field_labels": "Etiketter",
       "field_language": "Språk",
       "field_language_hint": "IETF BCP 47 språk tagg",
       "field_publisher": "Utgivare",
@@ -398,6 +445,7 @@
       "mixed": "BLANDAD",
       "tab_general": "Allämnt",
       "tab_poster": "Affisch",
+      "tab_sharing": "Delning",
       "tab_tags": "Taggar",
       "tags_notice_multiple_edit": "Du redigerar taggar för flera serier. Detta skriver över befintliga taggar i varje serie."
     },
@@ -407,12 +455,18 @@
       "dialog_title": "Redigera användare",
       "label_roles_for": "Roller för {name}"
     },
-    "edit_user_shared_libraries": {
-      "button_cancel": "Avbryt",
-      "button_confirm": "Spara ändringar",
-      "dialog_title": "Redigera delade bibliotek",
-      "field_all_libraries": "Alla bibliotek",
-      "label_shared_with": "Delat med {name}"
+    "edit_user_restrictions": {
+      "age_restriction": {
+        "allow_under": "Tillåt endast under",
+        "exclude_over": "Uteslut över",
+        "none": "Inga begränsningar"
+      },
+      "edit_restrictions_for": "Redigera begränsningar för {name}",
+      "label_age_restriction": "Åldersgräns",
+      "label_allow_only_labels": "Tillåt endast etiketter",
+      "label_exclude_labels": "Uteslut etiketter",
+      "tab_content_restrictions": "Begränsningar av innehållet",
+      "tab_shared_libraries": "Delade bibliotek"
     },
     "empty_trash": {
       "body": "Som standard tar mediaservern inte bort information för media direkt. Detta hjälper om en enhet tillfälligt kopplas bort. När du tömmer papperskorgen för ett bibliotek raderas all information om saknade media.",
@@ -474,6 +528,7 @@
         "height": "Höjd",
         "index": "Index",
         "media_type": "Mediatyp",
+        "size": "Storlek",
         "width": "Bredd"
       },
       "title": "Bokinformation",
@@ -487,10 +542,43 @@
       "title_comparison": "Bokjämförelse"
     }
   },
+  "duplicate_pages": {
+    "action_delete_auto": "Automatisk radering",
+    "action_delete_manual": "Manuell radering",
+    "action_delete_matches": "Ta bort matchningar",
+    "action_ignore": "Ignorera",
+    "delete_to_save": "Radera för att spara {size}",
+    "deleted_count": "Raderat {count} gånger",
+    "filter": {
+      "count": "Antal",
+      "delete_count": "Antal gånger raderat",
+      "delete_size": "Sparat utrymme",
+      "size": "Storlek",
+      "total_size": "Total storlek"
+    },
+    "info": "Om du tar bort dubbla sidor ändras dina filer. Säkerhetskopiera dina filer och använd manuell radering innan du använder automatisk radering.",
+    "matches_n": "Inga träffar | 1 träff | {count} träffar",
+    "saved_size": "Sparat {size}",
+    "title": "Duplicerade sidor",
+    "unknown_size": "Okänd storlek"
+  },
+  "duplicates": {
+    "file_hash": "Filhash",
+    "size": "Storlek",
+    "title": "Duplicera filer",
+    "url": "URL"
+  },
   "enums": {
     "copy_mode": {
       "HARDLINK": "Hårdlänk/kopiera filer",
       "MOVE": "Flytta filer"
+    },
+    "historical_event_type": {
+      "BookConverted": "Boken konverterad",
+      "BookFileDeleted": "Bokfilen raderad",
+      "BookImported": "Boken importerad",
+      "DuplicatePageDeleted": "Duplicerad sida borttagen",
+      "SeriesFolderDeleted": "Seriemappen borttagen"
     },
     "media_status": {
       "ERROR": "Fel",
@@ -498,6 +586,11 @@
       "READY": "Redo",
       "UNKNOWN": "Okänd",
       "UNSUPPORTED": "Saknar stöd"
+    },
+    "page_hash_action": {
+      "DELETE_AUTO": "Ta bort automatiskt",
+      "DELETE_MANUAL": "Manuell radering",
+      "IGNORE": "Ignorera"
     },
     "reading_direction": {
       "LEFT_TO_RIGHT": "Vänster till höger",
@@ -550,6 +643,7 @@
   "filter": {
     "age_rating": "åldersgräns",
     "age_rating_none": "Ingen",
+    "complete": "Komplett",
     "genre": "genre",
     "in_progress": "Pågående",
     "language": "språk",
@@ -564,6 +658,16 @@
   "filter_drawer": {
     "filter": "filter",
     "sort": "sortera"
+  },
+  "history": {
+    "header": {
+      "book": "Bok",
+      "date": "Datum",
+      "details": "Detaljer",
+      "series": "Serie",
+      "type": "Typ"
+    },
+    "title": "Historik"
   },
   "home": {
     "theme": "Tema",
@@ -589,6 +693,9 @@
     "status": "Status",
     "url": "URL"
   },
+  "media_management": {
+    "title": "Mediehantering"
+  },
   "menu": {
     "add_to_collection": "Lägg till i samling",
     "add_to_readlist": "Lägg till i läslista",
@@ -606,6 +713,15 @@
     "refresh_metadata": "Uppdatera metadata",
     "scan_library_files": "Skanna biblioteksfiler",
     "select_all": "Välj alla"
+  },
+  "metrics": {
+    "library_books": "Böcker per bibliotek",
+    "library_disk_space": "Bibliotekets diskutrymme",
+    "library_series": "Serier per bibliotek",
+    "library_sidecars": "Sidovagnar per bibliotek",
+    "tasks_executed": "Utförda uppgifter",
+    "tasks_total_time": "Uppdragens totala tid",
+    "title": "Mätvärden"
   },
   "navigation": {
     "home": "Hem",
@@ -652,7 +768,7 @@
   },
   "settings_user": {
     "change_password": "Byt lösenord",
-    "edit_shared_libraries": "Redigera delade bibliotek",
+    "edit_restrictions": "Redigera begränsningar",
     "edit_user": "Redigera användare",
     "latest_activity": "Senaste aktivitet: {date}",
     "no_recent_activity": "Ingen aktivitet nyligen",
@@ -677,6 +793,7 @@
   },
   "thumbnail_card": {
     "tooltip_delete": "Ta bort",
+    "tooltip_generated": "Genererat konstverk",
     "tooltip_mark_as_selected": "Markera som vald",
     "tooltip_selected": "Vald",
     "tooltip_sidecar": "Lokala bilder",
@@ -694,6 +811,9 @@
   "users": {
     "authentication_activity": "Autentiseringsaktivitet",
     "users": "Användare"
+  },
+  "validation": {
+    "zero_or_more": "Måste vara 0 eller mer"
   },
   "welcome": {
     "add_library": "Lägg till bibliotek",

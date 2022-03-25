@@ -1,5 +1,5 @@
 <template>
-  <div :style="$vuetify.breakpoint.name === 'xs' ? 'margin-bottom: 56px' : undefined">
+  <div :style="$vuetify.breakpoint.xs ? 'margin-bottom: 56px' : undefined">
     <toolbar-sticky v-if="selectedSeries.length === 0">
       <!--   Action menu   -->
       <library-actions-menu v-if="library"
@@ -14,7 +14,7 @@
 
       <v-spacer/>
 
-      <library-navigation v-if="$vuetify.breakpoint.name !== 'xs'" :libraryId="libraryId"/>
+      <library-navigation v-if="$vuetify.breakpoint.mdAndUp" :libraryId="libraryId"/>
 
       <v-spacer/>
 
@@ -35,9 +35,10 @@
       @mark-unread="markSelectedUnread"
       @add-to-collection="addToCollection"
       @edit="editMultipleSeries"
+      @delete="deleteSeries"
     />
 
-    <library-navigation v-if="$vuetify.breakpoint.name === 'xs'" :libraryId="libraryId" bottom-navigation/>
+    <library-navigation v-if="$vuetify.breakpoint.smAndDown" :libraryId="libraryId" bottom-navigation/>
 
     <filter-drawer
       v-model="drawer"
@@ -68,6 +69,14 @@
     </filter-drawer>
 
     <v-container fluid>
+      <alphabetical-navigation
+        class="text-center"
+        :symbols="alphabeticalNavigation"
+        :selected="selectedSymbol"
+        :group-count="seriesGroups"
+        @clicked="filterByStarting"
+      />
+
       <empty-state
         v-if="totalPages === 0 && sortOrFilterActive"
         :title="$t('common.filter_no_matches')"
@@ -86,14 +95,6 @@
       />
 
       <template v-if="totalPages > 0">
-        <alphabetical-navigation
-          class="text-center"
-          :symbols="alphabeticalNavigation"
-          :selected="selectedSymbol"
-          :group-count="seriesGroups"
-          @clicked="filterByStarting"
-        />
-
         <v-pagination
           v-if="totalPages > 1"
           v-model="page"
@@ -103,6 +104,7 @@
 
         <item-browser
           :items="series"
+          :item-context="itemContext"
           :selected.sync="selectedSeries"
           :edit-function="isAdmin ? editSingleSeries : undefined"
         />
@@ -127,7 +129,7 @@ import ItemBrowser from '@/components/ItemBrowser.vue'
 import LibraryNavigation from '@/components/LibraryNavigation.vue'
 import LibraryActionsMenu from '@/components/menus/LibraryActionsMenu.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
-import {parseQuerySort} from '@/functions/query-params'
+import {parseBooleanFilter, parseQuerySort} from '@/functions/query-params'
 import {ReadStatus, replaceCompositeReadStatus} from '@/types/enum-books'
 import {SeriesStatus, SeriesStatusKeyValue} from '@/types/enum-series'
 import {
@@ -154,6 +156,7 @@ import {LibrarySseDto, ReadProgressSeriesSseDto, SeriesSseDto} from '@/types/kom
 import {throttle} from 'lodash'
 import AlphabeticalNavigation from '@/components/AlphabeticalNavigation.vue'
 import {LibraryDto} from '@/types/komga-libraries'
+import {ItemContext} from '@/types/items'
 
 export default Vue.extend({
   name: 'BrowseLibraries',
@@ -177,7 +180,6 @@ export default Vue.extend({
       series: [] as SeriesDto[],
       seriesGroups: [] as GroupCountDto[],
       alphabeticalNavigation: ['ALL', '#', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
-      searchRegex: undefined as any,
       selectedSymbol: 'ALL',
       selectedSeries: [] as SeriesDto[],
       page: 1,
@@ -234,6 +236,7 @@ export default Vue.extend({
     await this.resetParams(this.$route, this.libraryId)
     if (this.$route.query.page) this.page = Number(this.$route.query.page)
     if (this.$route.query.pageSize) this.pageSize = Number(this.$route.query.pageSize)
+    if (this.$route.query.nav) this.selectedSymbol = this.$route.query.nav.toString()
 
     this.loadLibrary(this.libraryId)
 
@@ -251,7 +254,6 @@ export default Vue.extend({
       this.series = []
       this.seriesGroups = []
       this.selectedSymbol = 'ALL'
-      this.searchRegex = undefined
 
       this.loadLibrary(to.params.libraryId)
 
@@ -261,6 +263,17 @@ export default Vue.extend({
     next()
   },
   computed: {
+    searchRegex(): string | undefined {
+        if (this.selectedSymbol === 'ALL') return undefined
+        if (this.selectedSymbol === '#') return '^[^a-z],title_sort'
+        return `^${this.selectedSymbol},title_sort`
+    },
+    itemContext(): ItemContext[] {
+      if (this.sortActive.key === 'booksMetadata.releaseDate') return [ItemContext.RELEASE_DATE]
+      if (this.sortActive.key === 'createdDate') return [ItemContext.DATE_ADDED]
+      if (this.sortActive.key === 'lastModifiedDate') return [ItemContext.DATE_UPDATED]
+      return []
+    },
     sortOptions(): SortOption[] {
       return [
         {name: this.$t('sort.name').toString(), key: 'metadata.titleSort'},
@@ -279,6 +292,9 @@ export default Vue.extend({
             {name: this.$t('filter.in_progress').toString(), value: ReadStatus.IN_PROGRESS},
             {name: this.$t('filter.read').toString(), value: ReadStatus.READ},
           ],
+        },
+        complete: {
+          values: [{name: this.$t('filter.complete').toString(), value: 'true', nValue: 'false'}],
         },
       } as FiltersOptions
     },
@@ -333,12 +349,9 @@ export default Vue.extend({
   },
   methods: {
     filterByStarting(symbol: string) {
-      if (symbol === 'ALL') this.searchRegex = undefined
-      else if (symbol === '#') this.searchRegex = '^[^a-z],title_sort'
-      else this.searchRegex = `^${symbol},title_sort`
-
       this.selectedSymbol = symbol
       this.page = 1
+      this.updateRoute()
       this.loadPage(this.libraryId, 1, this.sortActive, this.searchRegex)
     },
     resetSortAndFilters() {
@@ -376,7 +389,7 @@ export default Vue.extend({
 
       // get filter from query params or local storage and validate with available filter values
       let activeFilters: any
-      if (route.query.status || route.query.readStatus || route.query.genre || route.query.tag || route.query.language || route.query.ageRating || route.query.publisher || authorRoles.some(role => role in route.query)) {
+      if (route.query.status || route.query.readStatus || route.query.genre || route.query.tag || route.query.language || route.query.ageRating || route.query.publisher || authorRoles.some(role => role in route.query) || route.query.complete) {
         activeFilters = {
           status: route.query.status || [],
           readStatus: route.query.readStatus || [],
@@ -386,6 +399,7 @@ export default Vue.extend({
           language: route.query.language || [],
           ageRating: route.query.ageRating || [],
           releaseDate: route.query.releaseDate || [],
+          complete: route.query.complete || [],
         }
         authorRoles.forEach((role: string) => {
           activeFilters[role] = route.query[role] || []
@@ -405,6 +419,7 @@ export default Vue.extend({
         language: filters.language?.filter(x => this.filterOptions.language.map(n => n.value).includes(x)) || [],
         ageRating: filters.ageRating?.filter(x => this.filterOptions.ageRating.map(n => n.value).includes(x)) || [],
         releaseDate: filters.releaseDate?.filter(x => this.filterOptions.releaseDate.map(n => n.value).includes(x)) || [],
+        complete: filters.complete?.filter(x => x === 'true' || x === 'false') || [],
       } as any
       authorRoles.forEach((role: string) => {
         validFilter[role] = filters[role] || []
@@ -479,6 +494,7 @@ export default Vue.extend({
           page: `${this.page}`,
           pageSize: `${this.pageSize}`,
           sort: `${this.sortActive.key},${this.sortActive.order}`,
+          nav: this.selectedSymbol,
         },
       } as Location
       mergeFilterParams(this.filters, loc.query)
@@ -509,13 +525,14 @@ export default Vue.extend({
       })
 
       const requestLibraryId = libraryId !== LIBRARIES_ALL ? libraryId : undefined
-      const seriesPage = await this.$komgaSeries.getSeries(requestLibraryId, pageRequest, undefined, this.filters.status, replaceCompositeReadStatus(this.filters.readStatus), this.filters.genre, this.filters.tag, this.filters.language, this.filters.publisher, this.filters.ageRating, this.filters.releaseDate, authorsFilter, searchRegex)
+      const complete = parseBooleanFilter(this.filters.complete)
+      const seriesPage = await this.$komgaSeries.getSeries(requestLibraryId, pageRequest, undefined, this.filters.status, replaceCompositeReadStatus(this.filters.readStatus), this.filters.genre, this.filters.tag, this.filters.language, this.filters.publisher, this.filters.ageRating, this.filters.releaseDate, authorsFilter, searchRegex, complete)
 
       this.totalPages = seriesPage.totalPages
       this.totalElements = seriesPage.totalElements
       this.series = seriesPage.content
 
-      const seriesGroups = await this.$komgaSeries.getAlphabeticalGroups(requestLibraryId, undefined, this.filters.status, replaceCompositeReadStatus(this.filters.readStatus), this.filters.genre, this.filters.tag, this.filters.language, this.filters.publisher, this.filters.ageRating, this.filters.releaseDate, authorsFilter)
+      const seriesGroups = await this.$komgaSeries.getAlphabeticalGroups(requestLibraryId, undefined, this.filters.status, replaceCompositeReadStatus(this.filters.readStatus), this.filters.genre, this.filters.tag, this.filters.language, this.filters.publisher, this.filters.ageRating, this.filters.releaseDate, authorsFilter, complete)
       const nonAlpha = seriesGroups
         .filter((g) => !(/[a-zA-Z]/).test(g.group))
         .reduce((a, b) => a + b.count, 0)
@@ -553,6 +570,9 @@ export default Vue.extend({
     },
     editMultipleSeries() {
       this.$store.dispatch('dialogUpdateSeries', this.selectedSeries)
+    },
+    deleteSeries() {
+      this.$store.dispatch('dialogDeleteSeries', this.selectedSeries)
     },
   },
 })

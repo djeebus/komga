@@ -8,11 +8,12 @@ import io.mockk.slot
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.catchThrowable
-import org.gotson.komga.application.tasks.TaskReceiver
+import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookMetadataPatchCapability
 import org.gotson.komga.domain.model.DirectoryNotFoundException
 import org.gotson.komga.domain.model.KomgaUser
+import org.gotson.komga.domain.model.MarkSelectedPreference
 import org.gotson.komga.domain.model.Media
 import org.gotson.komga.domain.model.ReadList
 import org.gotson.komga.domain.model.ScanResult
@@ -35,8 +36,8 @@ import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.persistence.ThumbnailBookRepository
 import org.gotson.komga.infrastructure.hash.Hasher
-import org.gotson.komga.infrastructure.language.toIndexedMap
-import org.gotson.komga.interfaces.rest.persistence.SeriesDtoRepository
+import org.gotson.komga.interfaces.api.persistence.SeriesDtoRepository
+import org.gotson.komga.language.toIndexedMap
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -87,7 +88,7 @@ class LibraryContentLifecycleTest(
   private lateinit var mockHasher: Hasher
 
   @MockkBean
-  private lateinit var mockTaskReceiver: TaskReceiver
+  private lateinit var mockTaskEmitter: TaskEmitter
 
   private val user = KomgaUser("user@example.org", "", false, id = "1")
 
@@ -98,8 +99,8 @@ class LibraryContentLifecycleTest(
 
   @BeforeEach
   fun beforeEach() {
-    every { mockTaskReceiver.refreshBookMetadata(any(), any()) } just Runs
-    every { mockTaskReceiver.refreshSeriesMetadata(any(), any()) } just Runs
+    every { mockTaskEmitter.refreshBookMetadata(any(), any()) } just Runs
+    every { mockTaskEmitter.refreshSeriesMetadata(any(), any()) } just Runs
   }
 
   @AfterAll
@@ -196,11 +197,95 @@ class LibraryContentLifecycleTest(
       val allBooks = bookRepository.findAll()
 
       verify(exactly = 2) { mockScanner.scanRootFolder(any()) }
+      verify(exactly = 0) { mockHasher.computeHash(any<Path>()) }
 
       assertThat(allSeries).hasSize(1)
       assertThat(allBooks).hasSize(1)
-      assertThat(allBooks.map { it.name }).containsExactly("book1")
-      assertThat(allBooks.first().lastModifiedDate).isNotEqualTo(allBooks.first().createdDate)
+      val book = allBooks.first()
+      assertThat(book.name).isEqualTo("book1")
+      assertThat(book.lastModifiedDate).isNotEqualTo(book.createdDate)
+      val media = mediaRepository.findById(book.id)
+      assertThat(media.status).isEqualTo(Media.Status.OUTDATED)
+    }
+
+    @Test
+    fun `given existing series when scanning and updated files have a different size then books are marked outdated`() {
+      // given
+      val library = makeLibrary()
+      libraryRepository.insert(library)
+
+      every { mockScanner.scanRootFolder(any()) }
+        .returnsMany(
+          mapOf(makeSeries(name = "series") to listOf(makeBook("book1").copy(fileSize = 1))).toScanResult(),
+          mapOf(makeSeries(name = "series") to listOf(makeBook("book1").copy(fileSize = 2))).toScanResult(),
+        )
+      libraryContentLifecycle.scanRootFolder(library)
+
+      bookRepository.findAll().first().let { book ->
+        bookRepository.update(book.copy(fileHash = "hashed"))
+        mediaRepository.update(mediaRepository.findById(book.id).copy(status = Media.Status.READY))
+      }
+
+      // when
+      libraryContentLifecycle.scanRootFolder(library)
+
+      // then
+      val allSeries = seriesRepository.findAll()
+      val allBooks = bookRepository.findAll()
+
+      verify(exactly = 2) { mockScanner.scanRootFolder(any()) }
+      verify(exactly = 0) { mockHasher.computeHash(any<Path>()) }
+
+      assertThat(allSeries).hasSize(1)
+      assertThat(allBooks).hasSize(1)
+      val book = allBooks.first()
+      assertThat(book.name).isEqualTo("book1")
+      assertThat(book.lastModifiedDate).isNotEqualTo(book.createdDate)
+      assertThat(book.fileHash).isBlank
+      val media = mediaRepository.findById(book.id)
+      assertThat(media.status).isEqualTo(Media.Status.OUTDATED)
+    }
+
+    @Test
+    fun `given existing series when scanning and updated files have the same hash then books are not marked outdated`() {
+      // given
+      val library = makeLibrary()
+      libraryRepository.insert(library)
+
+      every { mockScanner.scanRootFolder(any()) }
+        .returnsMany(
+          mapOf(makeSeries(name = "series") to listOf(makeBook("book1"))).toScanResult(),
+          mapOf(makeSeries(name = "series") to listOf(makeBook("book1"))).toScanResult(),
+        )
+      libraryContentLifecycle.scanRootFolder(library)
+
+      bookRepository.findAll().first().let { book ->
+        bookRepository.update(book.copy(fileHash = "hashed"))
+        mediaRepository.update(mediaRepository.findById(book.id).copy(status = Media.Status.READY))
+      }
+
+      every { mockHasher.computeHash(any<Path>()) } returns "hashed"
+
+      // when
+      libraryContentLifecycle.scanRootFolder(library)
+
+      // then
+      val allSeries = seriesRepository.findAll()
+      val allBooks = bookRepository.findAll()
+
+      verify(exactly = 2) { mockScanner.scanRootFolder(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
+
+      assertThat(allSeries).hasSize(1)
+      assertThat(allBooks).hasSize(1)
+      val book = allBooks.first()
+      assertThat(book.name).isEqualTo("book1")
+      assertThat(book.lastModifiedDate).isNotEqualTo(book.createdDate)
+      assertThat(book.fileHash).isEqualTo("hashed")
+      val media = mediaRepository.findById(book.id)
+      assertThat(media.status)
+        .isNotEqualTo(Media.Status.OUTDATED)
+        .isEqualTo(Media.Status.READY)
     }
 
     @Test
@@ -283,7 +368,7 @@ class LibraryContentLifecycleTest(
         )
       libraryContentLifecycle.scanRootFolder(library)
 
-      every { mockAnalyzer.analyze(any()) } returns Media(status = Media.Status.READY, mediaType = "application/zip", pages = mutableListOf(makeBookPage("1.jpg"), makeBookPage("2.jpg")), bookId = book1.id)
+      every { mockAnalyzer.analyze(any(), any()) } returns Media(status = Media.Status.READY, mediaType = "application/zip", pages = mutableListOf(makeBookPage("1.jpg"), makeBookPage("2.jpg")), bookId = book1.id)
       bookRepository.findAll().map { bookLifecycle.analyzeAndPersist(it) }
 
       // when
@@ -291,7 +376,7 @@ class LibraryContentLifecycleTest(
 
       // then
       verify(exactly = 2) { mockScanner.scanRootFolder(any()) }
-      verify(exactly = 1) { mockAnalyzer.analyze(any()) }
+      verify(exactly = 1) { mockAnalyzer.analyze(any(), any()) }
 
       bookRepository.findAll().first().let { book ->
         assertThat(book.lastModifiedDate).isNotEqualTo(book.createdDate)
@@ -306,7 +391,7 @@ class LibraryContentLifecycleTest(
     }
 
     @Test
-    fun `given existing book with different last modified date when rescanning then media is marked as outdated and hash is reset`() {
+    fun `given existing book with different last modified date and hash when rescanning then media is marked as outdated and hash is reset`() {
       // given
       val library = makeLibrary()
       libraryRepository.insert(library)
@@ -319,8 +404,8 @@ class LibraryContentLifecycleTest(
         )
       libraryContentLifecycle.scanRootFolder(library)
 
-      every { mockAnalyzer.analyze(any()) } returns Media(status = Media.Status.READY, mediaType = "application/zip", pages = mutableListOf(makeBookPage("1.jpg"), makeBookPage("2.jpg")), bookId = book1.id)
-      every { mockHasher.computeHash(any()) }.returnsMany("abc", "def")
+      every { mockAnalyzer.analyze(any(), any()) } returns Media(status = Media.Status.READY, mediaType = "application/zip", pages = mutableListOf(makeBookPage("1.jpg"), makeBookPage("2.jpg")), bookId = book1.id)
+      every { mockHasher.computeHash(any<Path>()) }.returnsMany("abc", "def")
 
       bookRepository.findAll().map {
         bookLifecycle.analyzeAndPersist(it)
@@ -332,12 +417,12 @@ class LibraryContentLifecycleTest(
 
       // then
       verify(exactly = 2) { mockScanner.scanRootFolder(any()) }
-      verify(exactly = 1) { mockAnalyzer.analyze(any()) }
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockAnalyzer.analyze(any(), any()) }
+      verify(exactly = 2) { mockHasher.computeHash(any<Path>()) }
 
       bookRepository.findAll().first().let { book ->
         assertThat(book.lastModifiedDate).isNotEqualTo(book.createdDate)
-        assertThat(book.fileHash).isEmpty()
+        assertThat(book.fileHash).isEqualTo("def")
 
         mediaRepository.findById(book.id).let { media ->
           assertThat(media.status).isEqualTo(Media.Status.OUTDATED)
@@ -488,7 +573,7 @@ class LibraryContentLifecycleTest(
         mediaRepository.update(mediaRepository.findById(it.id).copy(status = Media.Status.READY))
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       libraryContentLifecycle.scanRootFolder(library) // deletion
 
@@ -577,17 +662,17 @@ class LibraryContentLifecycleTest(
       bookRepository.findByIdOrNull(book.id)?.let {
         bookRepository.update(it.copy(fileHash = "sameHash"))
         mediaRepository.update(mediaRepository.findById(it.id).copy(status = Media.Status.READY))
-        bookLifecycle.addThumbnailForBook(ThumbnailBook(thumbnail = ByteArray(0), type = ThumbnailBook.Type.GENERATED, bookId = book.id))
-        bookLifecycle.addThumbnailForBook(ThumbnailBook(url = URL("file:/sidecar"), type = ThumbnailBook.Type.SIDECAR, bookId = book.id))
+        bookLifecycle.addThumbnailForBook(ThumbnailBook(thumbnail = ByteArray(0), type = ThumbnailBook.Type.GENERATED, bookId = book.id), MarkSelectedPreference.NO)
+        bookLifecycle.addThumbnailForBook(ThumbnailBook(url = URL("file:/sidecar"), type = ThumbnailBook.Type.SIDECAR, bookId = book.id), MarkSelectedPreference.NO)
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -623,17 +708,17 @@ class LibraryContentLifecycleTest(
       bookRepository.findByIdOrNull(book.id)?.let {
         bookRepository.update(it.copy(fileHash = "sameHash"))
         mediaRepository.update(mediaRepository.findById(it.id).copy(status = Media.Status.READY))
-        bookLifecycle.addThumbnailForBook(ThumbnailBook(thumbnail = ByteArray(0), type = ThumbnailBook.Type.GENERATED, bookId = book.id))
-        bookLifecycle.addThumbnailForBook(ThumbnailBook(url = URL("file:/sidecar"), type = ThumbnailBook.Type.SIDECAR, bookId = book.id))
+        bookLifecycle.addThumbnailForBook(ThumbnailBook(thumbnail = ByteArray(0), type = ThumbnailBook.Type.GENERATED, bookId = book.id), MarkSelectedPreference.NO)
+        bookLifecycle.addThumbnailForBook(ThumbnailBook(url = URL("file:/sidecar"), type = ThumbnailBook.Type.SIDECAR, bookId = book.id), MarkSelectedPreference.NO)
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -670,13 +755,13 @@ class LibraryContentLifecycleTest(
         bookLifecycle.markReadProgressCompleted(it.id, user)
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -713,13 +798,13 @@ class LibraryContentLifecycleTest(
         readListLifecycle.addReadList(ReadList("read list", bookIds = listOf(it.id).toIndexedMap()))
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -759,18 +844,18 @@ class LibraryContentLifecycleTest(
           bookMetadataRepository.findById(it.id).copy(
             title = "Updated Title",
             titleLock = true,
-          )
+          ),
         )
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
-      verify(exactly = 0) { mockTaskReceiver.refreshBookMetadata(bookRenamed.id, listOf(BookMetadataPatchCapability.TITLE)) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
+      verify(exactly = 0) { mockTaskEmitter.refreshBookMetadata(bookRenamed, setOf(BookMetadataPatchCapability.TITLE)) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -807,14 +892,14 @@ class LibraryContentLifecycleTest(
         bookRepository.update(it.copy(fileHash = "sameHash"))
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
-      verify(exactly = 1) { mockTaskReceiver.refreshBookMetadata(bookRenamed.id, listOf(BookMetadataPatchCapability.TITLE)) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
+      verify(exactly = 1) { mockTaskEmitter.refreshBookMetadata(withArg { assertThat(it.id).isEqualTo(bookRenamed.id) }, setOf(BookMetadataPatchCapability.TITLE)) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -850,13 +935,13 @@ class LibraryContentLifecycleTest(
         mediaRepository.findById(book.id).let { mediaRepository.update(it.copy(status = Media.Status.READY)) }
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -902,13 +987,13 @@ class LibraryContentLifecycleTest(
         mediaRepository.findById(book.id).let { mediaRepository.update(it.copy(status = Media.Status.READY)) }
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockHasher.computeHash(any()) }
+      verify(exactly = 1) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -961,7 +1046,7 @@ class LibraryContentLifecycleTest(
         mediaRepository.update(mediaRepository.findById(it.id).copy(status = Media.Status.READY))
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
@@ -1015,7 +1100,7 @@ class LibraryContentLifecycleTest(
         bookLifecycle.markReadProgressCompleted(it.id, user)
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
@@ -1071,7 +1156,7 @@ class LibraryContentLifecycleTest(
         readListLifecycle.addReadList(ReadList("read list", bookIds = listOf(it.id).toIndexedMap()))
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
@@ -1129,17 +1214,17 @@ class LibraryContentLifecycleTest(
           bookMetadataRepository.findById(it.id).copy(
             title = "Updated Title",
             titleLock = true,
-          )
+          ),
         )
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 0) { mockTaskReceiver.refreshBookMetadata(book2Moved.id, listOf(BookMetadataPatchCapability.TITLE)) }
+      verify(exactly = 0) { mockTaskEmitter.refreshBookMetadata(book2Moved, setOf(BookMetadataPatchCapability.TITLE)) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -1191,13 +1276,13 @@ class LibraryContentLifecycleTest(
         bookRepository.update(it.copy(fileHash = "sameHash"))
       }
 
-      every { mockHasher.computeHash(any()) } returns "sameHash"
+      every { mockHasher.computeHash(any<Path>()) } returns "sameHash"
 
       // when
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 1) { mockTaskReceiver.refreshBookMetadata(book2Moved.id, listOf(BookMetadataPatchCapability.TITLE)) }
+      verify(exactly = 1) { mockTaskEmitter.refreshBookMetadata(withArg { assertThat(it.id).isEqualTo(book2Moved.id) }, setOf(BookMetadataPatchCapability.TITLE)) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -1250,7 +1335,7 @@ class LibraryContentLifecycleTest(
       libraryContentLifecycle.scanRootFolder(library) // rename
 
       // then
-      verify(exactly = 2) { mockHasher.computeHash(any()) }
+      verify(exactly = 2) { mockHasher.computeHash(any<Path>()) }
 
       val allSeries = seriesRepository.findAll()
       val allBooks = bookRepository.findAll().sortedBy { it.number }
@@ -1543,8 +1628,8 @@ class LibraryContentLifecycleTest(
       libraryContentLifecycle.emptyTrash(library)
 
       // then
-      val collections = collectionRepository.findAll(null, Pageable.unpaged())
-      val readLists = readListRepository.findAll(null, Pageable.unpaged())
+      val collections = collectionRepository.findAll(pageable = Pageable.unpaged())
+      val readLists = readListRepository.findAll(pageable = Pageable.unpaged())
 
       assertThat(collections.content).isEmpty()
       assertThat(readLists.content).isEmpty()

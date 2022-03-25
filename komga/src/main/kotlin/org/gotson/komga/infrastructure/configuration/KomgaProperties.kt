@@ -23,7 +23,11 @@ class KomgaProperties {
 
   var deleteEmptyCollections: Boolean = true
 
+  @Deprecated("Deprecated since 0.143.0, you can configure this in the library options directly")
   var fileHashing: Boolean = true
+
+  @Positive
+  var pageHashing: Int = 3
 
   var rememberMe = RememberMe()
 
@@ -39,6 +43,14 @@ class KomgaProperties {
   var cors = Cors()
 
   var lucene = Lucene()
+
+  var configDir: String? = null
+
+  @Positive
+  var taskConsumers: Int = 1
+
+  @Positive
+  var taskConsumersMax: Int = 1
 
   class RememberMe {
     @get:NotBlank

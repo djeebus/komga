@@ -6,19 +6,22 @@ import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookPageContent
 import org.gotson.komga.domain.model.BookWithMedia
 import org.gotson.komga.domain.model.DomainEvent
+import org.gotson.komga.domain.model.HistoricalEvent
 import org.gotson.komga.domain.model.ImageConversionException
 import org.gotson.komga.domain.model.KomgaUser
+import org.gotson.komga.domain.model.MarkSelectedPreference
 import org.gotson.komga.domain.model.Media
 import org.gotson.komga.domain.model.MediaNotReadyException
 import org.gotson.komga.domain.model.ReadProgress
 import org.gotson.komga.domain.model.ThumbnailBook
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
+import org.gotson.komga.domain.persistence.HistoricalEventRepository
+import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.MediaRepository
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.ReadProgressRepository
 import org.gotson.komga.domain.persistence.ThumbnailBookRepository
-import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.gotson.komga.infrastructure.hash.Hasher
 import org.gotson.komga.infrastructure.image.ImageConverter
 import org.gotson.komga.infrastructure.image.ImageType
@@ -26,6 +29,12 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.time.LocalDateTime
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
+import kotlin.io.path.isWritable
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.notExists
+import kotlin.io.path.toPath
 
 private val logger = KotlinLogging.logger {}
 
@@ -37,22 +46,24 @@ class BookLifecycle(
   private val readProgressRepository: ReadProgressRepository,
   private val thumbnailBookRepository: ThumbnailBookRepository,
   private val readListRepository: ReadListRepository,
+  private val libraryRepository: LibraryRepository,
   private val bookAnalyzer: BookAnalyzer,
   private val imageConverter: ImageConverter,
   private val eventPublisher: EventPublisher,
   private val transactionTemplate: TransactionTemplate,
   private val hasher: Hasher,
-  private val komgaProperties: KomgaProperties,
+  private val historicalEventRepository: HistoricalEventRepository,
 ) {
 
   fun analyzeAndPersist(book: Book): Boolean {
     logger.info { "Analyze and persist book: $book" }
-    val media = bookAnalyzer.analyze(book)
+    val media = bookAnalyzer.analyze(book, libraryRepository.findById(book.libraryId).analyzeDimensions)
 
     transactionTemplate.executeWithoutResult {
       // if the number of pages has changed, delete all read progress for that book
       mediaRepository.findById(book.id).let { previous ->
         if (previous.status == Media.Status.OUTDATED && previous.pages.size != media.pages.size) {
+          logger.info { "Number of pages differ, reset read progress for book" }
           readProgressRepository.deleteByBookId(book.id)
         }
       }
@@ -66,8 +77,8 @@ class BookLifecycle(
   }
 
   fun hashAndPersist(book: Book) {
-    if (!komgaProperties.fileHashing)
-      return logger.info { "File hashing is disabled, it may have changed since the task was submitted, skipping" }
+    if (!libraryRepository.findById(book.libraryId).hashFiles)
+      return logger.info { "File hashing is disabled for the library, it may have changed since the task was submitted, skipping" }
 
     logger.info { "Hash and persist book: $book" }
     if (book.fileHash.isBlank()) {
@@ -78,21 +89,30 @@ class BookLifecycle(
     }
   }
 
+  fun hashPagesAndPersist(book: Book) {
+    if (!libraryRepository.findById(book.libraryId).hashPages)
+      return logger.info { "Page hashing is disabled for the library, it may have changed since the task was submitted, skipping" }
+
+    logger.info { "Hash and persist pages for book: $book" }
+
+    mediaRepository.update(bookAnalyzer.hashPages(BookWithMedia(book, mediaRepository.findById(book.id))))
+  }
+
   fun generateThumbnailAndPersist(book: Book) {
     logger.info { "Generate thumbnail and persist for book: $book" }
     try {
-      addThumbnailForBook(bookAnalyzer.generateThumbnail(BookWithMedia(book, mediaRepository.findById(book.id))))
+      addThumbnailForBook(bookAnalyzer.generateThumbnail(BookWithMedia(book, mediaRepository.findById(book.id))), MarkSelectedPreference.IF_NONE_OR_GENERATED)
     } catch (ex: Exception) {
       logger.error(ex) { "Error while creating thumbnail" }
     }
   }
 
-  fun addThumbnailForBook(thumbnail: ThumbnailBook) {
+  fun addThumbnailForBook(thumbnail: ThumbnailBook, markSelected: MarkSelectedPreference): ThumbnailBook {
     when (thumbnail.type) {
       ThumbnailBook.Type.GENERATED -> {
         // only one generated thumbnail is allowed
         thumbnailBookRepository.deleteByBookIdAndType(thumbnail.bookId, ThumbnailBook.Type.GENERATED)
-        thumbnailBookRepository.insert(thumbnail)
+        thumbnailBookRepository.insert(thumbnail.copy(selected = false))
       }
       ThumbnailBook.Type.SIDECAR -> {
         // delete existing thumbnail with the same url
@@ -101,16 +121,35 @@ class BookLifecycle(
           .forEach {
             thumbnailBookRepository.delete(it.id)
           }
-        thumbnailBookRepository.insert(thumbnail)
+        thumbnailBookRepository.insert(thumbnail.copy(selected = false))
+      }
+      ThumbnailBook.Type.USER_UPLOADED -> {
+        thumbnailBookRepository.insert(thumbnail.copy(selected = false))
       }
     }
 
-    eventPublisher.publishEvent(DomainEvent.ThumbnailBookAdded(thumbnail))
+    val selected = when (markSelected) {
+      MarkSelectedPreference.YES -> true
+      MarkSelectedPreference.IF_NONE_OR_GENERATED -> {
+        val selectedThumbnail = thumbnailBookRepository.findSelectedByBookIdOrNull(thumbnail.bookId)
+        selectedThumbnail == null || selectedThumbnail.type == ThumbnailBook.Type.GENERATED
+      }
+      MarkSelectedPreference.NO -> false
+    }
 
-    if (thumbnail.selected)
-      thumbnailBookRepository.markSelected(thumbnail)
-    else
-      thumbnailsHouseKeeping(thumbnail.bookId)
+    if (selected) thumbnailBookRepository.markSelected(thumbnail)
+    else thumbnailsHouseKeeping(thumbnail.bookId)
+
+    val newThumbnail = thumbnail.copy(selected = selected)
+    eventPublisher.publishEvent(DomainEvent.ThumbnailBookAdded(newThumbnail))
+    return newThumbnail
+  }
+
+  fun deleteThumbnailForBook(thumbnail: ThumbnailBook) {
+    require(thumbnail.type == ThumbnailBook.Type.USER_UPLOADED) { "Only uploaded thumbnails can be deleted" }
+    thumbnailBookRepository.delete(thumbnail.id)
+    thumbnailsHouseKeeping(thumbnail.bookId)
+    eventPublisher.publishEvent(DomainEvent.ThumbnailBookDeleted(thumbnail))
   }
 
   fun getThumbnail(bookId: String): ThumbnailBook? {
@@ -134,6 +173,18 @@ class BookLifecycle(
     }
     return null
   }
+
+  fun getThumbnailBytesByThumbnailId(thumbnailId: String): ByteArray? =
+    thumbnailBookRepository.findByIdOrNull(thumbnailId)?.let {
+      getBytesFromThumbnailBook(it)
+    }
+
+  private fun getBytesFromThumbnailBook(thumbnail: ThumbnailBook): ByteArray? =
+    when {
+      thumbnail.thumbnail != null -> thumbnail.thumbnail
+      thumbnail.url != null -> File(thumbnail.url.toURI()).readBytes()
+      else -> null
+    }
 
   private fun thumbnailsHouseKeeping(bookId: String) {
     logger.info { "House keeping thumbnails for book: $bookId" }
@@ -162,7 +213,7 @@ class BookLifecycle(
   @Throws(
     ImageConversionException::class,
     MediaNotReadyException::class,
-    IndexOutOfBoundsException::class
+    IndexOutOfBoundsException::class,
   )
   fun getBookPage(book: Book, number: Int, convertTo: ImageType? = null, resizeTo: Int? = null): BookPageContent {
     val media = mediaRepository.findById(book.id)
@@ -271,5 +322,30 @@ class BookLifecycle(
       readProgressRepository.delete(book.id, user.id)
       eventPublisher.publishEvent(DomainEvent.ReadProgressDeleted(progress))
     }
+  }
+
+  fun deleteBookFiles(book: Book) {
+    if (book.path.notExists()) return logger.info { "Cannot delete book file, path does not exist: ${book.path}" }
+    if (!book.path.isWritable()) return logger.info { "Cannot delete book file, path is not writable: ${book.path}" }
+
+    val thumbnails = thumbnailBookRepository.findAllByBookIdAndType(book.id, ThumbnailBook.Type.SIDECAR)
+      .mapNotNull { it.url?.toURI()?.toPath() }
+      .filter { it.exists() && it.isWritable() }
+
+    if (book.path.deleteIfExists()) {
+      logger.info { "Deleted file: ${book.path}" }
+      historicalEventRepository.insert(HistoricalEvent.BookFileDeleted(book, "File was deleted by user request"))
+    }
+    thumbnails.forEach {
+      if (it.deleteIfExists()) logger.info { "Deleted file: $it" }
+    }
+
+    if (book.path.parent.listDirectoryEntries().isEmpty())
+      if (book.path.parent.deleteIfExists()) {
+        logger.info { "Deleted directory: ${book.path.parent}" }
+        historicalEventRepository.insert(HistoricalEvent.SeriesFolderDeleted(book.seriesId, book.path.parent, "Folder was deleted because it was empty"))
+      }
+
+    softDeleteMany(listOf(book))
   }
 }

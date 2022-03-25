@@ -36,10 +36,26 @@ export interface ReadProgressSeriesSseDto {
 export interface ThumbnailBookSseDto {
   bookId: string,
   seriesId: string,
+  selected: boolean,
 }
 
 export interface ThumbnailSeriesSseDto {
   seriesId: string,
+  selected: boolean,
+}
+
+export interface ThumbnailReadListSseDto {
+  readListId: string,
+  selected: boolean,
+}
+
+export interface ThumbnailCollectionSseDto {
+  collectionId: string,
+  selected: boolean,
+}
+
+export interface SessionExpiredDto {
+  userId: string,
 }
 
 export interface TaskQueueSseDto {

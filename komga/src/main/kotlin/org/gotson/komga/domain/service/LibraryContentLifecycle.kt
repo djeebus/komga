@@ -2,7 +2,7 @@ package org.gotson.komga.domain.service
 
 import mu.KotlinLogging
 import org.gotson.komga.application.events.EventPublisher
-import org.gotson.komga.application.tasks.TaskReceiver
+import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookMetadataPatchCapability
 import org.gotson.komga.domain.model.BookSearch
@@ -27,8 +27,8 @@ import org.gotson.komga.domain.persistence.SidecarRepository
 import org.gotson.komga.domain.persistence.ThumbnailBookRepository
 import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.gotson.komga.infrastructure.hash.Hasher
-import org.gotson.komga.infrastructure.language.notEquals
-import org.gotson.komga.infrastructure.language.toIndexedMap
+import org.gotson.komga.language.notEquals
+import org.gotson.komga.language.toIndexedMap
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.nio.file.Paths
@@ -50,7 +50,7 @@ class LibraryContentLifecycle(
   private val readListLifecycle: ReadListLifecycle,
   private val sidecarRepository: SidecarRepository,
   private val komgaProperties: KomgaProperties,
-  private val taskReceiver: TaskReceiver,
+  private val taskEmitter: TaskEmitter,
   private val transactionTemplate: TransactionTemplate,
   private val hasher: Hasher,
   private val bookMetadataRepository: BookMetadataRepository,
@@ -147,17 +147,30 @@ class LibraryContentLifecycle(
               existingBooks.find { it.url == newBook.url && it.deletedDate == null }?.let { existingBook ->
                 logger.debug { "Matched existing book: $existingBook" }
                 if (newBook.fileLastModified.notEquals(existingBook.fileLastModified)) {
-                  logger.info { "Book changed on disk, update and reset media status: $existingBook" }
-                  val updatedBook = existingBook.copy(
-                    fileLastModified = newBook.fileLastModified,
-                    fileSize = newBook.fileSize,
-                    fileHash = "",
-                  )
-                  transactionTemplate.executeWithoutResult {
-                    mediaRepository.findById(existingBook.id).let {
-                      mediaRepository.update(it.copy(status = Media.Status.OUTDATED))
-                    }
+                  val hash = if (existingBook.fileSize == newBook.fileSize && existingBook.fileHash.isNotBlank()) {
+                    hasher.computeHash(newBook.path)
+                  } else null
+                  if (hash == existingBook.fileHash) {
+                    logger.info { "Book changed on disk, but still has the same hash, no need to reset media status: $existingBook" }
+                    val updatedBook = existingBook.copy(
+                      fileLastModified = newBook.fileLastModified,
+                      fileSize = newBook.fileSize,
+                      fileHash = hash,
+                    )
                     bookRepository.update(updatedBook)
+                  } else {
+                    logger.info { "Book changed on disk, update and reset media status: $existingBook" }
+                    val updatedBook = existingBook.copy(
+                      fileLastModified = newBook.fileLastModified,
+                      fileSize = newBook.fileSize,
+                      fileHash = hash ?: "",
+                    )
+                    transactionTemplate.executeWithoutResult {
+                      mediaRepository.findById(existingBook.id).let {
+                        mediaRepository.update(it.copy(status = Media.Status.OUTDATED))
+                      }
+                      bookRepository.update(updatedBook)
+                    }
                   }
                 }
               }
@@ -177,7 +190,7 @@ class LibraryContentLifecycle(
       // for all series where books have been removed or added, trigger a sort and refresh metadata
       seriesToSortAndRefresh.distinctBy { it.id }.forEach {
         seriesLifecycle.sortBooks(it)
-        taskReceiver.refreshSeriesMetadata(it.id)
+        taskEmitter.refreshSeriesMetadata(it.id)
       }
 
       val existingSidecars = sidecarRepository.findAll()
@@ -189,16 +202,16 @@ class LibraryContentLifecycle(
               seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, newSidecar.parentUrl)?.let { series ->
                 logger.info { "Sidecar changed on disk (${newSidecar.url}, refresh Series for ${newSidecar.type}: $series" }
                 when (newSidecar.type) {
-                  Sidecar.Type.ARTWORK -> taskReceiver.refreshSeriesLocalArtwork(series.id)
-                  Sidecar.Type.METADATA -> taskReceiver.refreshSeriesMetadata(series.id)
+                  Sidecar.Type.ARTWORK -> taskEmitter.refreshSeriesLocalArtwork(series.id)
+                  Sidecar.Type.METADATA -> taskEmitter.refreshSeriesMetadata(series.id)
                 }
               }
             Sidecar.Source.BOOK ->
               bookRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, newSidecar.parentUrl)?.let { book ->
                 logger.info { "Sidecar changed on disk (${newSidecar.url}, refresh Book for ${newSidecar.type}: $book" }
                 when (newSidecar.type) {
-                  Sidecar.Type.ARTWORK -> taskReceiver.refreshBookLocalArtwork(book.id)
-                  Sidecar.Type.METADATA -> taskReceiver.refreshBookMetadata(book.id)
+                  Sidecar.Type.ARTWORK -> taskEmitter.refreshBookLocalArtwork(book)
+                  Sidecar.Type.METADATA -> taskEmitter.refreshBookMetadata(book)
                 }
               }
           }
@@ -218,6 +231,8 @@ class LibraryContentLifecycle(
       if (library.emptyTrashAfterScan) emptyTrash(library)
       else cleanupEmptySets()
     }.also { logger.info { "Library updated in $it" } }
+
+    eventPublisher.publishEvent(DomainEvent.LibraryScanned(library))
   }
 
   /**
@@ -264,8 +279,8 @@ class LibraryContentLifecycle(
               deleted.copy(
                 seriesId = newSeries.id,
                 title = if (deleted.titleLock) deleted.title else newlyAdded.title,
-                titleSort = if (deleted.titleSortLock) deleted.titleSort else newlyAdded.titleSort
-              )
+                titleSort = if (deleted.titleSortLock) deleted.titleSort else newlyAdded.titleSort,
+              ),
             )
           }
 
@@ -274,8 +289,8 @@ class LibraryContentLifecycle(
             .forEach { col ->
               collectionRepository.update(
                 col.copy(
-                  seriesIds = col.seriesIds.map { if (it == match.first.id) newSeries.id else it }
-                )
+                  seriesIds = col.seriesIds.map { if (it == match.first.id) newSeries.id else it },
+                ),
               )
             }
 
@@ -334,9 +349,9 @@ class LibraryContentLifecycle(
                 deleted.copy(
                   bookId = bookToAdd.id,
                   title = if (deleted.titleLock) deleted.title else newlyAdded.title,
-                )
+                ),
               )
-              if (!deleted.titleLock) taskReceiver.refreshBookMetadata(bookToAdd.id, listOf(BookMetadataPatchCapability.TITLE))
+              if (!deleted.titleLock) taskEmitter.refreshBookMetadata(bookToAdd, setOf(BookMetadataPatchCapability.TITLE))
             }
 
             // copy read progress
@@ -349,8 +364,8 @@ class LibraryContentLifecycle(
               .forEach { rl ->
                 readListRepository.update(
                   rl.copy(
-                    bookIds = rl.bookIds.values.map { if (it == match.id) bookToAdd.id else it }.toIndexedMap()
-                  )
+                    bookIds = rl.bookIds.values.map { if (it == match.id) bookToAdd.id else it }.toIndexedMap(),
+                  ),
                 )
               }
 

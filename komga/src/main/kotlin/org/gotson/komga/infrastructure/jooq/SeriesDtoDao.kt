@@ -1,6 +1,7 @@
 package org.gotson.komga.infrastructure.jooq
 
 import mu.KotlinLogging
+import org.gotson.komga.domain.model.ContentRestrictions
 import org.gotson.komga.domain.model.ReadStatus
 import org.gotson.komga.domain.model.SeriesSearch
 import org.gotson.komga.domain.model.SeriesSearchWithReadProgress
@@ -8,12 +9,12 @@ import org.gotson.komga.infrastructure.datasource.SqliteUdfDataSource
 import org.gotson.komga.infrastructure.search.LuceneEntity
 import org.gotson.komga.infrastructure.search.LuceneHelper
 import org.gotson.komga.infrastructure.web.toFilePath
-import org.gotson.komga.interfaces.rest.dto.AuthorDto
-import org.gotson.komga.interfaces.rest.dto.BookMetadataAggregationDto
-import org.gotson.komga.interfaces.rest.dto.GroupCountDto
-import org.gotson.komga.interfaces.rest.dto.SeriesDto
-import org.gotson.komga.interfaces.rest.dto.SeriesMetadataDto
-import org.gotson.komga.interfaces.rest.persistence.SeriesDtoRepository
+import org.gotson.komga.interfaces.api.persistence.SeriesDtoRepository
+import org.gotson.komga.interfaces.api.rest.dto.AuthorDto
+import org.gotson.komga.interfaces.api.rest.dto.BookMetadataAggregationDto
+import org.gotson.komga.interfaces.api.rest.dto.GroupCountDto
+import org.gotson.komga.interfaces.api.rest.dto.SeriesDto
+import org.gotson.komga.interfaces.api.rest.dto.SeriesMetadataDto
 import org.gotson.komga.jooq.Tables
 import org.gotson.komga.jooq.tables.records.BookMetadataAggregationRecord
 import org.gotson.komga.jooq.tables.records.SeriesMetadataRecord
@@ -25,6 +26,7 @@ import org.jooq.ResultQuery
 import org.jooq.SelectOnConditionStep
 import org.jooq.impl.DSL
 import org.jooq.impl.DSL.count
+import org.jooq.impl.DSL.countDistinct
 import org.jooq.impl.DSL.lower
 import org.jooq.impl.DSL.substring
 import org.springframework.data.domain.Page
@@ -37,7 +39,6 @@ import java.net.URL
 
 private val logger = KotlinLogging.logger {}
 
-const val BOOKS_COUNT = "booksCount"
 const val BOOKS_UNREAD_COUNT = "booksUnreadCount"
 const val BOOKS_IN_PROGRESS_COUNT = "booksInProgressCount"
 const val BOOKS_READ_COUNT = "booksReadCount"
@@ -54,6 +55,7 @@ class SeriesDtoDao(
   private val cs = Tables.COLLECTION_SERIES
   private val g = Tables.SERIES_METADATA_GENRE
   private val st = Tables.SERIES_METADATA_TAG
+  private val sl = Tables.SERIES_METADATA_SHARING
   private val bma = Tables.BOOK_METADATA_AGGREGATION
   private val bmaa = Tables.BOOK_METADATA_AGGREGATION_AUTHOR
   private val bmat = Tables.BOOK_METADATA_AGGREGATION_TAG
@@ -77,8 +79,8 @@ class SeriesDtoDao(
     "booksCount" to s.BOOK_COUNT,
   )
 
-  override fun findAll(search: SeriesSearchWithReadProgress, userId: String, pageable: Pageable): Page<SeriesDto> {
-    val conditions = search.toCondition()
+  override fun findAll(search: SeriesSearchWithReadProgress, userId: String, pageable: Pageable, restrictions: ContentRestrictions): Page<SeriesDto> {
+    val conditions = search.toCondition().and(restrictions.toCondition(dsl))
 
     return findAll(conditions, userId, pageable, search.toJoinConditions(), search.searchTerm)
   }
@@ -87,9 +89,10 @@ class SeriesDtoDao(
     collectionId: String,
     search: SeriesSearchWithReadProgress,
     userId: String,
-    pageable: Pageable
+    pageable: Pageable,
+    restrictions: ContentRestrictions,
   ): Page<SeriesDto> {
-    val conditions = search.toCondition().and(cs.COLLECTION_ID.eq(collectionId))
+    val conditions = search.toCondition().and(restrictions.toCondition(dsl)).and(cs.COLLECTION_ID.eq(collectionId))
     val joinConditions = search.toJoinConditions().copy(selectCollectionNumber = true, collection = true)
 
     return findAll(conditions, userId, pageable, joinConditions, search.searchTerm)
@@ -98,16 +101,18 @@ class SeriesDtoDao(
   override fun findAllRecentlyUpdated(
     search: SeriesSearchWithReadProgress,
     userId: String,
-    pageable: Pageable
+    restrictions: ContentRestrictions,
+    pageable: Pageable,
   ): Page<SeriesDto> {
     val conditions = search.toCondition()
-      .and(s.CREATED_DATE.ne(s.LAST_MODIFIED_DATE))
+      .and(restrictions.toCondition(dsl))
+      .and(s.CREATED_DATE.notEqual(s.LAST_MODIFIED_DATE))
 
     return findAll(conditions, userId, pageable, search.toJoinConditions(), search.searchTerm)
   }
 
-  override fun countByFirstCharacter(search: SeriesSearchWithReadProgress, userId: String): List<GroupCountDto> {
-    val conditions = search.toCondition()
+  override fun countByFirstCharacter(search: SeriesSearchWithReadProgress, userId: String, restrictions: ContentRestrictions): List<GroupCountDto> {
+    val conditions = search.toCondition().and(restrictions.toCondition(dsl))
     val joinConditions = search.toJoinConditions()
     val seriesIds = luceneHelper.searchEntitiesIds(search.searchTerm, LuceneEntity.Series)
     val searchCondition = s.ID.inOrNoCondition(seriesIds)
@@ -143,7 +148,7 @@ class SeriesDtoDao(
 
   private fun selectBase(
     userId: String,
-    joinConditions: JoinConditions = JoinConditions()
+    joinConditions: JoinConditions = JoinConditions(),
   ): SelectOnConditionStep<Record> =
     dsl.selectDistinct(*groupFields)
       .apply { if (joinConditions.selectCollectionNumber) select(cs.NUMBER) }
@@ -170,7 +175,7 @@ class SeriesDtoDao(
     val seriesIds = luceneHelper.searchEntitiesIds(searchTerm, LuceneEntity.Series)
     val searchCondition = s.ID.inOrNoCondition(seriesIds)
 
-    val count = dsl.select(count(s.ID))
+    val count = dsl.select(countDistinct(s.ID))
       .from(s)
       .leftJoin(d).on(s.ID.eq(d.SERIES_ID))
       .leftJoin(bma).on(s.ID.eq(bma.SERIES_ID))
@@ -185,7 +190,7 @@ class SeriesDtoDao(
       .apply { if (joinConditions.aggregationAuthor) leftJoin(bmaa).on(s.ID.eq(bmaa.SERIES_ID)) }
       .where(conditions)
       .and(searchCondition)
-      .fetchOne(count(s.ID)) ?: 0
+      .fetchOne(countDistinct(s.ID)) ?: 0
 
     val orderBy =
       pageable.sort.mapNotNull {
@@ -205,7 +210,7 @@ class SeriesDtoDao(
       dtos,
       if (pageable.isPaged) PageRequest.of(pageable.pageNumber, pageable.pageSize, pageSort)
       else PageRequest.of(0, maxOf(count, 20), pageSort),
-      count.toLong()
+      count.toLong(),
     )
   }
 
@@ -232,6 +237,11 @@ class SeriesDtoDao(
           .where(st.SERIES_ID.eq(sr.id))
           .fetchSet(st.TAG)
 
+        val sharingLabels = dsl.select(sl.LABEL)
+          .from(sl)
+          .where(sl.SERIES_ID.eq(sr.id))
+          .fetchSet(sl.LABEL)
+
         val aggregatedAuthors = dsl.selectFrom(bmaa)
           .where(bmaa.SERIES_ID.eq(sr.id))
           .fetchInto(bmaa)
@@ -247,8 +257,8 @@ class SeriesDtoDao(
           booksReadCount,
           booksUnreadCount,
           booksInProgressCount,
-          dr.toDto(genres, tags),
-          bmar.toDto(aggregatedAuthors, aggregatedTags)
+          dr.toDto(genres, tags, sharingLabels),
+          bmar.toDto(aggregatedAuthors, aggregatedTags),
         )
       }
 
@@ -259,12 +269,14 @@ class SeriesDtoDao(
     if (!collectionIds.isNullOrEmpty()) c = c.and(cs.COLLECTION_ID.`in`(collectionIds))
     searchRegex?.let { c = c.and((it.second.toColumn()).likeRegex(it.first)) }
     if (!metadataStatus.isNullOrEmpty()) c = c.and(d.STATUS.`in`(metadataStatus))
-    if (!publishers.isNullOrEmpty()) c = c.and(lower(d.PUBLISHER).`in`(publishers.map { it.lowercase() }))
+    if (!publishers.isNullOrEmpty()) c = c.and(d.PUBLISHER.collate(SqliteUdfDataSource.collationUnicode3).`in`(publishers))
     if (deleted == true) c = c.and(s.DELETED_DATE.isNotNull)
     if (deleted == false) c = c.and(s.DELETED_DATE.isNull)
-    if (!languages.isNullOrEmpty()) c = c.and(lower(d.LANGUAGE).`in`(languages.map { it.lowercase() }))
-    if (!genres.isNullOrEmpty()) c = c.and(lower(g.GENRE).`in`(genres.map { it.lowercase() }))
-    if (!tags.isNullOrEmpty()) c = c.and(lower(st.TAG).`in`(tags.map { it.lowercase() }).or(lower(bmat.TAG).`in`(tags.map { it.lowercase() })))
+    if (complete == false) c = c.and(d.TOTAL_BOOK_COUNT.isNotNull.and(d.TOTAL_BOOK_COUNT.ne(s.BOOK_COUNT)))
+    if (complete == true) c = c.and(d.TOTAL_BOOK_COUNT.isNotNull.and(d.TOTAL_BOOK_COUNT.eq(s.BOOK_COUNT)))
+    if (!languages.isNullOrEmpty()) c = c.and(d.LANGUAGE.collate(SqliteUdfDataSource.collationUnicode3).`in`(languages))
+    if (!genres.isNullOrEmpty()) c = c.and(g.GENRE.collate(SqliteUdfDataSource.collationUnicode3).`in`(genres))
+    if (!tags.isNullOrEmpty()) c = c.and(st.TAG.collate(SqliteUdfDataSource.collationUnicode3).`in`(tags).or(bmat.TAG.collate(SqliteUdfDataSource.collationUnicode3).`in`(tags)))
     if (!ageRatings.isNullOrEmpty()) {
       val c1 = if (ageRatings.contains(null)) d.AGE_RATING.isNull else DSL.noCondition()
       val c2 = if (ageRatings.filterNotNull().isNotEmpty()) d.AGE_RATING.`in`(ageRatings.filterNotNull()) else DSL.noCondition()
@@ -322,7 +334,7 @@ class SeriesDtoDao(
     booksUnreadCount: Int,
     booksInProgressCount: Int,
     metadata: SeriesMetadataDto,
-    booksMetadata: BookMetadataAggregationDto
+    booksMetadata: BookMetadataAggregationDto,
   ) =
     SeriesDto(
       id = id,
@@ -341,7 +353,7 @@ class SeriesDtoDao(
       deleted = deletedDate != null,
     )
 
-  private fun SeriesMetadataRecord.toDto(genres: Set<String>, tags: Set<String>) =
+  private fun SeriesMetadataRecord.toDto(genres: Set<String>, tags: Set<String>, sharingLabels: Set<String>) =
     SeriesMetadataDto(
       status = status,
       statusLock = statusLock,
@@ -367,6 +379,8 @@ class SeriesDtoDao(
       tagsLock = tagsLock,
       totalBookCount = totalBookCount,
       totalBookCountLock = totalBookCountLock,
+      sharingLabels = sharingLabels,
+      sharingLabelsLock = sharingLabelsLock,
     )
 
   private fun BookMetadataAggregationRecord.toDto(authors: List<AuthorDto>, tags: Set<String>) =
@@ -378,6 +392,6 @@ class SeriesDtoDao(
       summaryNumber = summaryNumber,
 
       created = createdDate.toCurrentTimeZone(),
-      lastModified = lastModifiedDate.toCurrentTimeZone()
+      lastModified = lastModifiedDate.toCurrentTimeZone(),
     )
 }

@@ -22,7 +22,7 @@ import java.time.LocalDateTime
 class SeriesMetadataDaoTest(
   @Autowired private val seriesMetadataDao: SeriesMetadataDao,
   @Autowired private val seriesRepository: SeriesRepository,
-  @Autowired private val libraryRepository: LibraryRepository
+  @Autowired private val libraryRepository: LibraryRepository,
 ) {
 
   private val library = makeLibrary()
@@ -62,6 +62,7 @@ class SeriesMetadataDaoTest(
       tags = setOf("tag", "another"),
       language = "en",
       totalBookCount = 5,
+      sharingLabels = setOf("kids"),
       titleLock = true,
       titleSortLock = true,
       summaryLock = true,
@@ -72,7 +73,8 @@ class SeriesMetadataDaoTest(
       languageLock = true,
       tagsLock = true,
       totalBookCountLock = true,
-      seriesId = series.id
+      sharingLabelsLock = true,
+      seriesId = series.id,
     )
 
     seriesMetadataDao.insert(metadata)
@@ -93,6 +95,7 @@ class SeriesMetadataDaoTest(
     assertThat(created.genres).containsAll(metadata.genres)
     assertThat(created.tags).containsAll(metadata.tags)
     assertThat(created.totalBookCount).isEqualTo(metadata.totalBookCount)
+    assertThat(created.sharingLabels).containsAll(metadata.sharingLabels)
 
     assertThat(created.titleLock).isEqualTo(metadata.titleLock)
     assertThat(created.titleSortLock).isEqualTo(metadata.titleSortLock)
@@ -105,6 +108,7 @@ class SeriesMetadataDaoTest(
     assertThat(created.languageLock).isEqualTo(metadata.languageLock)
     assertThat(created.tagsLock).isEqualTo(metadata.tagsLock)
     assertThat(created.totalBookCountLock).isEqualTo(metadata.totalBookCountLock)
+    assertThat(created.sharingLabelsLock).isEqualTo(metadata.sharingLabelsLock)
   }
 
   @Test
@@ -114,7 +118,7 @@ class SeriesMetadataDaoTest(
     val now = LocalDateTime.now()
     val metadata = SeriesMetadata(
       title = "Series",
-      seriesId = series.id
+      seriesId = series.id,
     )
 
     seriesMetadataDao.insert(metadata)
@@ -135,6 +139,7 @@ class SeriesMetadataDaoTest(
     assertThat(created.genres).isEmpty()
     assertThat(created.tags).isEmpty()
     assertThat(created.totalBookCount).isNull()
+    assertThat(created.sharingLabels).isEmpty()
 
     assertThat(created.titleLock).isFalse
     assertThat(created.titleSortLock).isFalse
@@ -147,6 +152,7 @@ class SeriesMetadataDaoTest(
     assertThat(created.languageLock).isFalse
     assertThat(created.tagsLock).isFalse
     assertThat(created.totalBookCountLock).isFalse
+    assertThat(created.sharingLabelsLock).isFalse
   }
 
   @Test
@@ -157,7 +163,7 @@ class SeriesMetadataDaoTest(
       status = SeriesMetadata.Status.ENDED,
       title = "Series",
       titleSort = "Series, The",
-      seriesId = series.id
+      seriesId = series.id,
     )
 
     seriesMetadataDao.insert(metadata)
@@ -198,7 +204,8 @@ class SeriesMetadataDaoTest(
       genres = setOf("Action"),
       tags = setOf("tag"),
       totalBookCount = 3,
-      seriesId = series.id
+      sharingLabels = setOf("kids"),
+      seriesId = series.id,
     )
     seriesMetadataDao.insert(metadata)
     val created = seriesMetadataDao.findById(metadata.seriesId)
@@ -218,6 +225,7 @@ class SeriesMetadataDaoTest(
         genres = setOf("Adventure"),
         tags = setOf("Another"),
         totalBookCount = 8,
+        sharingLabels = setOf("adult"),
         statusLock = true,
         titleLock = true,
         titleSortLock = true,
@@ -229,6 +237,7 @@ class SeriesMetadataDaoTest(
         genresLock = true,
         tagsLock = true,
         totalBookCountLock = true,
+        sharingLabelsLock = true,
       )
     }
 
@@ -251,6 +260,7 @@ class SeriesMetadataDaoTest(
     assertThat(modified.genres).containsAll(updated.genres)
     assertThat(modified.tags).containsAll(updated.tags)
     assertThat(modified.totalBookCount).isEqualTo(updated.totalBookCount)
+    assertThat(modified.sharingLabels).containsAll(updated.sharingLabels)
 
     assertThat(modified.titleLock).isTrue
     assertThat(modified.titleSortLock).isTrue
@@ -263,5 +273,6 @@ class SeriesMetadataDaoTest(
     assertThat(modified.publisherLock).isTrue
     assertThat(modified.tagsLock).isTrue
     assertThat(modified.totalBookCountLock).isTrue
+    assertThat(modified.sharingLabelsLock).isTrue
   }
 }

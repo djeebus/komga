@@ -15,16 +15,11 @@ import org.apache.activemq.artemis.core.config.Configuration as ArtemisConfigura
 private val logger = KotlinLogging.logger {}
 
 const val QUEUE_UNIQUE_ID = "unique_id"
-const val QUEUE_TYPE = "type"
-const val QUEUE_SUB_TYPE = "subtype"
 
 const val QUEUE_TASKS = "tasks.background"
-const val QUEUE_TASKS_TYPE = "task"
-const val QUEUE_TASKS_SELECTOR = "$QUEUE_TYPE = '$QUEUE_TASKS_TYPE'"
+const val TOPIC_EVENTS = "domain.events"
 
-const val QUEUE_SSE = "sse"
-const val QUEUE_SSE_TYPE = "sse"
-const val QUEUE_SSE_SELECTOR = "$QUEUE_TYPE = '$QUEUE_SSE_TYPE'"
+const val JMS_PROPERTY_TYPE = "type"
 
 const val TOPIC_FACTORY = "topicJmsListenerContainerFactory"
 const val QUEUE_FACTORY = "queueJmsListenerContainerFactory"
@@ -40,18 +35,18 @@ class ArtemisConfig : ArtemisConfigurationCustomizer {
         QUEUE_TASKS,
         AddressSettings().apply {
           defaultConsumerWindowSize = 0
-        }
+        },
       )
       it.addQueueConfiguration(
         QueueConfiguration(QUEUE_TASKS)
           .setAddress(QUEUE_TASKS)
           .setLastValueKey(QUEUE_UNIQUE_ID)
-          .setRoutingType(RoutingType.ANYCAST)
+          .setRoutingType(RoutingType.ANYCAST),
       )
       it.addQueueConfiguration(
-        QueueConfiguration(QUEUE_SSE)
-          .setAddress(QUEUE_SSE)
-          .setRoutingType(RoutingType.MULTICAST)
+        QueueConfiguration(TOPIC_EVENTS)
+          .setAddress(TOPIC_EVENTS)
+          .setRoutingType(RoutingType.MULTICAST),
       )
     }
   }

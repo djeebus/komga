@@ -32,7 +32,7 @@ class BookMetadataLifecycle(
   private val eventPublisher: EventPublisher,
 ) {
 
-  fun refreshMetadata(book: Book, capabilities: List<BookMetadataPatchCapability>) {
+  fun refreshMetadata(book: Book, capabilities: Set<BookMetadataPatchCapability>) {
     logger.info { "Refresh metadata for book: $book with capabilities: $capabilities" }
     val media = mediaRepository.findById(book.id)
 
@@ -50,7 +50,7 @@ class BookMetadataLifecycle(
         provider is IsbnBarcodeProvider && !library.importBarcodeIsbn ->
           logger.info { "Library is not set to import book metadata from Barcode ISBN, skipping" }
         else -> {
-          logger.debug { "Provider: $provider" }
+          logger.debug { "Provider: ${provider.javaClass.simpleName}" }
           val patch = provider.getBookMetadataFromBook(BookWithMedia(book, media))
 
           if (
@@ -74,7 +74,7 @@ class BookMetadataLifecycle(
 
   private fun handlePatchForReadLists(
     patch: BookMetadataPatch?,
-    book: Book
+    book: Book,
   ) {
     patch?.readLists?.forEach { readList ->
 
@@ -89,11 +89,11 @@ class BookMetadataLifecycle(
               existing.bookIds.lastKey() + 1
             } else {
               logger.debug { "Adding book '${book.name}' to existing read list '${existing.name}'" }
-              readList.number ?: existing.bookIds.lastKey() + 1
+              readList.number ?: (existing.bookIds.lastKey() + 1)
             }
             map[key] = book.id
             readListLifecycle.updateReadList(
-              existing.copy(bookIds = map)
+              existing.copy(bookIds = map),
             )
           }
         } else {
@@ -101,8 +101,8 @@ class BookMetadataLifecycle(
           readListLifecycle.addReadList(
             ReadList(
               name = readList.name,
-              bookIds = mapOf((readList.number ?: 0) to book.id).toSortedMap()
-            )
+              bookIds = mapOf((readList.number ?: 0) to book.id).toSortedMap(),
+            ),
           )
         }
       }
@@ -111,7 +111,7 @@ class BookMetadataLifecycle(
 
   private fun handlePatchForBookMetadata(
     patch: BookMetadataPatch?,
-    book: Book
+    book: Book,
   ) {
     patch?.let { bPatch ->
       bookMetadataRepository.findById(book.id).let {

@@ -186,14 +186,14 @@
     "delete": "Törlés",
     "dismiss": "Elvet",
     "download": "Letöltés",
-    "email": "E-mail cím",
+    "email": "E-mail-cím",
     "filter_no_matches": "A jelenleg aktív szűrő szerint üres",
     "genre": "Műfaj",
     "go_to_library": "Menj a könyvtárba",
     "go_to_readlist": "Olvasólistához lépés",
     "go_to_series": "Könyvsorozathoz lépés",
     "library": "Könyvtár",
-    "locale_name": "Magyar",
+    "locale_name": "magyar",
     "locale_rtl": "false",
     "lock_all": "Összes lezárása",
     "n_selected": "{count} kiválasztva",
@@ -258,7 +258,7 @@
       "button_cancel": "Mégse",
       "button_confirm": "Hozzáadás",
       "dialog_title": "Felhasználó hozzáadása",
-      "field_email": "E-mail cím",
+      "field_email": "E-mail-cím",
       "field_email_error": "Érvényes e-mail címnek kell lennie",
       "field_password": "Jelszó",
       "field_role_administrator": "Adminisztrátor",
@@ -404,13 +404,6 @@
       "button_confirm": "Módosítások mentése",
       "dialog_title": "Felhasználó szerkesztése",
       "label_roles_for": "{name} szerepei"
-    },
-    "edit_user_shared_libraries": {
-      "button_cancel": "Mégse",
-      "button_confirm": "Módosítások mentése",
-      "dialog_title": "Megosztott könyvtárak szerkesztése",
-      "field_all_libraries": "Minden könyvtár",
-      "label_shared_with": "Megosztva a következővel: {name}"
     },
     "empty_trash": {
       "button_confirm": "Üres",
@@ -645,7 +638,6 @@
   },
   "settings_user": {
     "change_password": "Jelszó módosítása",
-    "edit_shared_libraries": "Megosztott könyvtárak szerkesztése",
     "edit_user": "Felhasználó szerkesztése",
     "latest_activity": "Utolsó aktivitás: {date}",
     "no_recent_activity": "Nincs mostani aktivitás",

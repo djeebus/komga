@@ -8,7 +8,7 @@ import org.gotson.komga.domain.model.makeSeries
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
-import org.gotson.komga.infrastructure.language.toIndexedMap
+import org.gotson.komga.language.toIndexedMap
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -26,7 +26,7 @@ class ReadListDaoTest(
   @Autowired private val readListDao: ReadListDao,
   @Autowired private val bookRepository: BookRepository,
   @Autowired private val seriesRepository: SeriesRepository,
-  @Autowired private val libraryRepository: LibraryRepository
+  @Autowired private val libraryRepository: LibraryRepository,
 ) {
 
   private val library = makeLibrary()
@@ -61,7 +61,7 @@ class ReadListDaoTest(
     val readList = ReadList(
       name = "MyReadList",
       summary = "summary",
-      bookIds = books.map { it.id }.toIndexedMap()
+      bookIds = books.map { it.id }.toIndexedMap(),
     )
 
     // when
@@ -89,7 +89,7 @@ class ReadListDaoTest(
 
     val readList = ReadList(
       name = "MyReadList",
-      bookIds = books.map { it.id }.toIndexedMap()
+      bookIds = books.map { it.id }.toIndexedMap(),
     )
 
     readListDao.insert(readList)
@@ -98,7 +98,7 @@ class ReadListDaoTest(
     val updatedReadList = readList.copy(
       name = "UpdatedReadList",
       summary = "summary",
-      bookIds = readList.bookIds.values.take(5).toIndexedMap()
+      bookIds = readList.bookIds.values.take(5).toIndexedMap(),
     )
 
     val now = LocalDateTime.now()
@@ -125,13 +125,13 @@ class ReadListDaoTest(
 
     val readList1 = ReadList(
       name = "MyReadList",
-      bookIds = books.map { it.id }.toIndexedMap()
+      bookIds = books.map { it.id }.toIndexedMap(),
     )
     readListDao.insert(readList1)
 
     val readList2 = ReadList(
       name = "MyReadList",
-      bookIds = books.map { it.id }.take(5).toIndexedMap()
+      bookIds = books.map { it.id }.take(5).toIndexedMap(),
     )
     readListDao.insert(readList2)
 
@@ -161,30 +161,30 @@ class ReadListDaoTest(
     readListDao.insert(
       ReadList(
         name = "readListLibrary1",
-        bookIds = listOf(bookLibrary1.id).toIndexedMap()
-      )
+        bookIds = listOf(bookLibrary1.id).toIndexedMap(),
+      ),
     )
 
     readListDao.insert(
       ReadList(
         name = "readListLibrary2",
-        bookIds = listOf(bookLibrary2.id).toIndexedMap()
-      )
+        bookIds = listOf(bookLibrary2.id).toIndexedMap(),
+      ),
     )
 
     readListDao.insert(
       ReadList(
         name = "readListLibraryBoth",
-        bookIds = listOf(bookLibrary1.id, bookLibrary2.id).toIndexedMap()
-      )
+        bookIds = listOf(bookLibrary1.id, bookLibrary2.id).toIndexedMap(),
+      ),
     )
 
     // when
-    val foundLibrary1Filtered = readListDao.findAllByLibraryIds(listOf(library.id), listOf(library.id), pageable = Pageable.unpaged()).content
-    val foundLibrary1Unfiltered = readListDao.findAllByLibraryIds(listOf(library.id), null, pageable = Pageable.unpaged()).content
-    val foundLibrary2Filtered = readListDao.findAllByLibraryIds(listOf(library2.id), listOf(library2.id), pageable = Pageable.unpaged()).content
-    val foundLibrary2Unfiltered = readListDao.findAllByLibraryIds(listOf(library2.id), null, pageable = Pageable.unpaged()).content
-    val foundBothUnfiltered = readListDao.findAllByLibraryIds(listOf(library.id, library2.id), null, pageable = Pageable.unpaged()).content
+    val foundLibrary1Filtered = readListDao.findAll(listOf(library.id), listOf(library.id), pageable = Pageable.unpaged()).content
+    val foundLibrary1Unfiltered = readListDao.findAll(listOf(library.id), null, pageable = Pageable.unpaged()).content
+    val foundLibrary2Filtered = readListDao.findAll(listOf(library2.id), listOf(library2.id), pageable = Pageable.unpaged()).content
+    val foundLibrary2Unfiltered = readListDao.findAll(listOf(library2.id), null, pageable = Pageable.unpaged()).content
+    val foundBothUnfiltered = readListDao.findAll(listOf(library.id, library2.id), null, pageable = Pageable.unpaged()).content
 
     // then
     assertThat(foundLibrary1Filtered).hasSize(2)
@@ -193,7 +193,7 @@ class ReadListDaoTest(
       assertThat(bookIds.values)
         .hasSize(1)
         .containsExactly(bookLibrary1.id)
-      assertThat(filtered).isTrue()
+      assertThat(filtered).isTrue
     }
 
     assertThat(foundLibrary1Unfiltered).hasSize(2)
@@ -202,7 +202,7 @@ class ReadListDaoTest(
       assertThat(bookIds.values)
         .hasSize(2)
         .containsExactly(bookLibrary1.id, bookLibrary2.id)
-      assertThat(filtered).isFalse()
+      assertThat(filtered).isFalse
     }
 
     assertThat(foundLibrary2Filtered).hasSize(2)
@@ -211,7 +211,7 @@ class ReadListDaoTest(
       assertThat(bookIds.values)
         .hasSize(1)
         .containsExactly(bookLibrary2.id)
-      assertThat(filtered).isTrue()
+      assertThat(filtered).isTrue
     }
 
     assertThat(foundLibrary2Unfiltered).hasSize(2)
@@ -220,7 +220,7 @@ class ReadListDaoTest(
       assertThat(bookIds.values)
         .hasSize(2)
         .containsExactly(bookLibrary1.id, bookLibrary2.id)
-      assertThat(filtered).isFalse()
+      assertThat(filtered).isFalse
     }
 
     assertThat(foundBothUnfiltered).hasSize(3)
@@ -229,7 +229,7 @@ class ReadListDaoTest(
       assertThat(bookIds.values)
         .hasSize(2)
         .containsExactly(bookLibrary1.id, bookLibrary2.id)
-      assertThat(filtered).isFalse()
+      assertThat(filtered).isFalse
     }
   }
 }

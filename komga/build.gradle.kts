@@ -1,4 +1,5 @@
 import org.apache.tools.ant.taskdefs.condition.Os
+import org.gradle.crypto.checksum.Checksum
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -7,12 +8,14 @@ plugins {
     kotlin("plugin.spring")
     kotlin("kapt")
   }
-  id("org.springframework.boot") version "2.5.5"
+  id("org.springframework.boot") version "2.5.8"
   id("com.gorylenko.gradle-git-properties") version "2.3.2"
-  id("nu.studer.jooq") version "5.2.2"
-  id("org.flywaydb.flyway") version "7.10.0"
+  id("nu.studer.jooq") version "5.2.2" // 6.0.0 requires Java 11
+  id("org.flywaydb.flyway") version "7.15.0"
   id("com.github.johnrengelman.processes") version "0.5.0"
-  id("org.springdoc.openapi-gradle-plugin") version "1.3.2"
+  id("org.springdoc.openapi-gradle-plugin") version "1.3.3"
+  id("org.gradle.crypto.checksum") version "1.4.0"
+
   jacoco
 }
 
@@ -22,7 +25,8 @@ dependencies {
   implementation(kotlin("stdlib-jdk8"))
   implementation(kotlin("reflect"))
 
-  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.5"))
+  // 2.6.0 brings assertj-core 3.21.0 which causes type inference issues in Kotlin, should be fixed in Kotlin 1.6.20
+  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.8"))
 
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -35,18 +39,18 @@ dependencies {
   implementation("org.springframework.session:spring-session-core")
   implementation("com.github.gotson:spring-session-caffeine:1.0.3")
 
-  kapt("org.springframework.boot:spring-boot-configuration-processor:2.5.5")
+  kapt("org.springframework.boot:spring-boot-configuration-processor:2.5.8")
 
   implementation("org.apache.activemq:artemis-jms-server")
 
   implementation("org.flywaydb:flyway-core")
 
-  implementation("io.github.microutils:kotlin-logging-jvm:2.0.8")
+  implementation("io.github.microutils:kotlin-logging-jvm:2.1.21")
   implementation("io.micrometer:micrometer-registry-influx")
   implementation("io.hawt:hawtio-springboot:2.13.5")
 
   run {
-    val springdocVersion = "1.5.9"
+    val springdocVersion = "1.5.12" // later uses Spring Boot 2.6.0
     implementation("org.springdoc:springdoc-openapi-ui:$springdocVersion")
     implementation("org.springdoc:springdoc-openapi-security:$springdocVersion")
     implementation("org.springdoc:springdoc-openapi-kotlin:$springdocVersion")
@@ -56,30 +60,30 @@ dependencies {
   implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
   implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
 
-  implementation("commons-io:commons-io:2.10.0")
+  implementation("commons-io:commons-io:2.11.0")
   implementation("org.apache.commons:commons-lang3:3.12.0")
   implementation("commons-validator:commons-validator:1.7")
 
   run {
-    val luceneVersion = "8.9.0"
+    val luceneVersion = "8.11.1" // 9.0.0 requires Java 11
     implementation("org.apache.lucene:lucene-core:$luceneVersion")
     implementation("org.apache.lucene:lucene-analyzers-common:$luceneVersion")
     implementation("org.apache.lucene:lucene-queryparser:$luceneVersion")
   }
 
-  implementation("com.ibm.icu:icu4j:69.1")
+  implementation("com.ibm.icu:icu4j:70.1")
 
-  implementation("org.apache.tika:tika-core:1.26")
-  implementation("org.apache.commons:commons-compress:1.20")
+  implementation("org.apache.tika:tika-core:2.2.0")
+  implementation("org.apache.commons:commons-compress:1.21")
   implementation("com.github.junrar:junrar:7.4.0")
-  implementation("org.apache.pdfbox:pdfbox:2.0.23")
+  implementation("org.apache.pdfbox:pdfbox:2.0.25")
   implementation("net.grey-panther:natural-comparator:1.1")
-  implementation("org.jsoup:jsoup:1.13.1") // TODO: once updated to 1.14.2, address changes in EpubMetadataProvider.kt
+  implementation("org.jsoup:jsoup:1.14.3")
 
-  implementation("net.coobird:thumbnailator:0.4.14")
-  runtimeOnly("com.twelvemonkeys.imageio:imageio-jpeg:3.7.0")
-  runtimeOnly("com.twelvemonkeys.imageio:imageio-tiff:3.7.0")
-  runtimeOnly("com.twelvemonkeys.imageio:imageio-webp:3.7.0")
+  implementation("net.coobird:thumbnailator:0.4.15")
+  runtimeOnly("com.twelvemonkeys.imageio:imageio-jpeg:3.8.0")
+  runtimeOnly("com.twelvemonkeys.imageio:imageio-tiff:3.8.0")
+  runtimeOnly("com.twelvemonkeys.imageio:imageio-webp:3.8.0")
   implementation("com.github.gotson:webp-imageio:0.2.2")
   // support for jpeg2000
   runtimeOnly("com.github.jai-imageio:jai-imageio-jpeg2000:1.4.0")
@@ -90,9 +94,9 @@ dependencies {
 
   implementation("com.jakewharton.byteunits:byteunits:0.9.1")
 
-  implementation("com.github.f4b6a3:tsid-creator:3.0.1")
+  implementation("com.github.f4b6a3:tsid-creator:4.1.4")
 
-  implementation("com.github.ben-manes.caffeine:caffeine:2.9.0")
+  implementation("com.github.ben-manes.caffeine:caffeine:2.9.3") // 3.0.0 requires Java 11
 
   implementation("org.xerial:sqlite-jdbc:3.36.0.3")
   jooqGenerator("org.xerial:sqlite-jdbc:3.36.0.3")
@@ -101,17 +105,21 @@ dependencies {
     exclude(module = "mockito-core")
   }
   testImplementation("org.springframework.security:spring-security-test")
-  testImplementation("com.ninja-squad:springmockk:3.0.1")
-  testImplementation("io.mockk:mockk:1.11.0")
+  testImplementation("com.ninja-squad:springmockk:3.1.0")
+  testImplementation("io.mockk:mockk:1.12.1")
   testImplementation("com.google.jimfs:jimfs:1.2")
 
-  testImplementation("com.tngtech.archunit:archunit-junit5:0.19.0")
+  testImplementation("com.tngtech.archunit:archunit-junit5:0.22.0")
 
-  developmentOnly("org.springframework.boot:spring-boot-devtools:2.5.5")
+  developmentOnly("org.springframework.boot:spring-boot-devtools:2.5.8")
 }
 
 val webui = "$rootDir/komga-webui"
 tasks {
+  withType<JavaCompile> {
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+  }
   withType<KotlinCompile> {
     kotlinOptions {
       jvmTarget = "1.8"
@@ -136,6 +144,12 @@ tasks {
 
   getByName<Jar>("jar") {
     enabled = false
+  }
+
+  register<Checksum>("checksums") {
+    group = "build"
+    inputFiles.from(files(bootJar))
+    appendFileNameToChecksum.set(true)
   }
 
   // unpack Spring Boot's fat jar for better Docker image layering
@@ -223,6 +237,7 @@ val migrationDirsSqlite = listOf(
 flyway {
   url = dbSqlite["url"]
   locations = arrayOf("classpath:db/migration/sqlite")
+  placeholders = mapOf("library-file-hashing" to "true")
 }
 tasks.flywayMigrate {
   // in order to include the Java migrations, flywayClasses must be run before flywayMigrate

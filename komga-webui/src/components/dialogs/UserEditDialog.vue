@@ -56,6 +56,7 @@ import {UserRoles} from '@/types/enum-users'
 import Vue from 'vue'
 import {ERROR} from '@/types/events'
 import {LibraryDto} from '@/types/komga-libraries'
+import {UserDto, UserUpdateDto} from '@/types/komga-users'
 
 export default Vue.extend({
   name: 'UserEditDialog',
@@ -104,11 +105,11 @@ export default Vue.extend({
     },
     async editUser() {
       try {
-        const roles = {
+        const patch = {
           roles: this.roles,
-        } as RolesUpdateDto
+        } as UserUpdateDto
 
-        await this.$store.dispatch('updateUserRoles', {userId: this.user.id, roles: roles})
+        await this.$store.dispatch('updateUser', {userId: this.user.id, patch: patch})
       } catch (e) {
         this.$eventHub.$emit(ERROR, {message: e.message} as ErrorEvent)
       }

@@ -42,7 +42,9 @@
   },
   "book_card": {
     "error": "Error",
+    "no_release_date": "No release date",
     "unknown": "To be analyzed",
+    "unread": "Unread",
     "unsupported": "Unsupported"
   },
   "book_import": {
@@ -128,6 +130,7 @@
       "cycle_scale": "Cycle scale",
       "cycle_side_padding": "Cycle side padding",
       "first_page": "First page",
+      "fullscreen": "Enter/exit full screen",
       "last_page": "Last page",
       "left_to_right": "Left to Right",
       "menus": "Menus",
@@ -151,6 +154,7 @@
     "file": "FILE",
     "format": "FORMAT",
     "isbn": "ISBN",
+    "links": "LINKS",
     "navigation_within_readlist": "Navigation within the readlist: {name}",
     "outdated_tooltip": "The file for this book has changed, this book must be re-analyzed",
     "read_book": "Read book",
@@ -176,6 +180,7 @@
     "title": "{name} collection"
   },
   "common": {
+    "age": "Age",
     "all_libraries": "All Libraries",
     "books": "Books",
     "books_n": "No book | 1 book | {count} books",
@@ -185,9 +190,11 @@
     "collections": "Collections",
     "create": "Create",
     "delete": "Delete",
+    "disk_space": "Disk space",
     "dismiss": "Dismiss",
     "download": "Download",
     "email": "Email",
+    "filename": "Filename",
     "filter_no_matches": "The active filter has no matches",
     "genre": "Genre",
     "go_to_library": "Go to library",
@@ -200,6 +207,8 @@
     "n_selected": "{count} selected",
     "nothing_to_show": "Nothing to show",
     "outdated": "Outdated",
+    "page": "Page",
+    "page_number": "Page number",
     "pages": "pages",
     "pages_n": "No pages | 1 page | {count} pages",
     "password": "Password",
@@ -210,10 +219,13 @@
     "required": "Required",
     "reset_filters": "Reset filters",
     "roles": "Roles",
+    "save_changes": "Save changes",
     "series": "Series",
+    "sidecars": "Sidecars",
     "tags": "Tags",
     "unavailable": "Unavailable",
     "unlock_all": "Unlock all",
+    "url": "URL",
     "use_filter_panel_to_change_filter": "Use the filter panel to change the active filter",
     "year": "year"
   },
@@ -272,6 +284,15 @@
       "button_confirm": "Analyze",
       "title": "Analyze library"
     },
+    "delete_book": {
+      "button_confirm": "Delete",
+      "confirm_delete": "Yes, delete book \"{name}\" and its files",
+      "confirm_delete_multiple": "Yes, delete {count} books and their files",
+      "dialog_title": "Delete Book",
+      "dialog_title_multiple": "Delete Books",
+      "warning_html": "The book <b>{name}</b> will be removed from this server alongside with stored media files. This <b>cannot</b> be undone. Continue?",
+      "warning_multiple_html": "{count} books will be removed from this server alongside with stored media files. This <b>cannot</b> be undone. Continue?"
+    },
     "delete_collection": {
       "button_confirm": "Delete",
       "confirm_delete": "Yes, delete the collection \"{name}\"",
@@ -296,6 +317,14 @@
       "warning_html": "The read list <b>{name}</b> will be removed from this server. Your media files will not be affected. This <b>cannot</b> be undone. Continue?",
       "warning_multiple_html": "{count} read lists will be removed from this server. Your media files will not be affected. This <b>cannot</b> be undone. Continue?"
     },
+    "delete_series": {
+      "button_confirm": "Delete",
+      "confirm_delete": "Yes, delete series \"{name}\" and its files",
+      "confirm_delete_multiple": "Yes, delete {count} series and their files",
+      "dialog_title": "Delete Series",
+      "warning_html": "The Series <b>{name}</b> will be removed from this server alongside with stored media files. This <b>cannot</b> be undone. Continue?",
+      "warning_multiple_html": "{count} series will be removed from this server alongside with stored media files. This <b>cannot</b> be undone. Continue?"
+    },
     "delete_user": {
       "button_confirm": "Delete",
       "confirm_delete": "Yes, delete the user \"{name}\"",
@@ -303,6 +332,7 @@
       "warning_html": "The user <b>{name}</b> will be deleted from this server. This <b>cannot</b> be undone. Continue?"
     },
     "edit_books": {
+      "add_author_role_error_duplicate": "Already exists",
       "authors_notice_multiple_edit": "You are editing authors for multiple books. This will override existing authors of each book.",
       "button_cancel": "Cancel",
       "button_confirm": "Save changes",
@@ -310,6 +340,10 @@
       "dialog_title_single": "Edit {book}",
       "field_isbn": "ISBN",
       "field_isbn_error": "Must be a valid ISBN 13",
+      "field_link_label": "Label",
+      "field_link_url": "URL",
+      "field_link_url_error_protocol": "Must be http or https",
+      "field_link_url_error_url": "Must be a valid URL",
       "field_number": "Number",
       "field_number_sort": "Sort Number",
       "field_number_sort_hint": "You can use decimal numbers",
@@ -320,6 +354,8 @@
       "field_title": "Title",
       "tab_authors": "Authors",
       "tab_general": "General",
+      "tab_links": "Links",
+      "tab_poster": "Poster",
       "tab_tags": "Tags",
       "tags_notice_multiple_edit": "You are editing tags for multiple books. This will override existing tags of each book."
     },
@@ -328,7 +364,9 @@
       "button_confirm": "Save changes",
       "dialog_title": "Edit collection",
       "field_manual_ordering": "Manual ordering",
-      "label_ordering": "By default, series in a collection will be ordered by name. You can enable manual ordering to define your own order."
+      "label_ordering": "By default, series in a collection will be ordered by name. You can enable manual ordering to define your own order.",
+      "tab_general": "General",
+      "tab_poster": "Poster"
     },
     "edit_library": {
       "button_browse": "Browse",
@@ -338,6 +376,9 @@
       "button_next": "Next",
       "dialog_title_add": "Add Library",
       "dialot_title_edit": "Edit Library",
+      "field_analysis_analyze_dimensions": "Analyze pages dimensions",
+      "field_analysis_hash_files": "Compute hash for files",
+      "field_analysis_hash_pages": "Compute hash for pages",
       "field_convert_to_cbz": "Automatically convert to CBZ",
       "field_import_barcode_isbn": "ISBN barcode",
       "field_import_comicinfo_book": "Book metadata",
@@ -357,6 +398,7 @@
       "field_series_cover": "Series cover",
       "file_browser_dialog_button_confirm": "Choose",
       "file_browser_dialog_title": "Library's root folder",
+      "label_analysis": "Analysis",
       "label_file_management": "File management",
       "label_import_barcode_isbn": "Import ISBN within barcode",
       "label_import_comicinfo": "Import metadata for CBR/CBZ containing a ComicInfo.xml file",
@@ -367,14 +409,18 @@
       "label_series_cover": "Series cover",
       "tab_general": "General",
       "tab_metadata": "Metadata",
-      "tab_options": "Options"
+      "tab_options": "Options",
+      "tooltip_scanner_force_modified_time": "Enable if the library is on a Google Drive",
+      "tooltip_use_resources": "Can consume lots of resources on large libraries or slow hardware"
     },
     "edit_readlist": {
       "button_cancel": "Cancel",
       "button_confirm": "Save changes",
       "dialog_title": "Edit read list",
       "field_name": "Name",
-      "field_summary": "Summary"
+      "field_summary": "Summary",
+      "tab_general": "General",
+      "tab_poster": "Poster"
     },
     "edit_series": {
       "button_cancel": "Cancel",
@@ -384,6 +430,7 @@
       "field_age_rating": "Age Rating",
       "field_age_rating_error": "Age rating must be 0 or more",
       "field_genres": "Genres",
+      "field_labels": "Labels",
       "field_language": "Language",
       "field_language_hint": "IETF BCP 47 language tag",
       "field_publisher": "Publisher",
@@ -398,6 +445,7 @@
       "mixed": "MIXED",
       "tab_general": "General",
       "tab_poster": "Poster",
+      "tab_sharing": "Sharing",
       "tab_tags": "Tags",
       "tags_notice_multiple_edit": "You are editing tags for multiple series. This will override existing tags of each series."
     },
@@ -407,12 +455,18 @@
       "dialog_title": "Edit user",
       "label_roles_for": "Roles for {name}"
     },
-    "edit_user_shared_libraries": {
-      "button_cancel": "Cancel",
-      "button_confirm": "Save changes",
-      "dialog_title": "Edit shared libraries",
-      "field_all_libraries": "All libraries",
-      "label_shared_with": "Shared with {name}"
+    "edit_user_restrictions": {
+      "age_restriction": {
+        "allow_under": "Allow only under",
+        "exclude_over": "Exclude over",
+        "none": "No restriction"
+      },
+      "edit_restrictions_for": "Edit restrictions for {name}",
+      "label_age_restriction": "Age restriction",
+      "label_allow_only_labels": "Allow only labels",
+      "label_exclude_labels": "Exclude labels",
+      "tab_content_restrictions": "Content Restrictions",
+      "tab_shared_libraries": "Shared Libraries"
     },
     "empty_trash": {
       "body": "By default the media server doesn't remove information for media right away. This helps if a drive is temporarily disconnected. When you empty the trash for a library, all information about missing media is deleted.",
@@ -474,6 +528,7 @@
         "height": "Height",
         "index": "Index",
         "media_type": "Media type",
+        "size": "Size",
         "width": "Width"
       },
       "title": "Book Details",
@@ -487,10 +542,43 @@
       "title_comparison": "Book Comparison"
     }
   },
+  "duplicate_pages": {
+    "action_delete_auto": "Auto delete",
+    "action_delete_manual": "Manual delete",
+    "action_delete_matches": "Delete matches",
+    "action_ignore": "Ignore",
+    "delete_to_save": "Delete to save {size}",
+    "deleted_count": "Deleted {count} times",
+    "filter": {
+      "count": "Count",
+      "delete_count": "Deletion count",
+      "delete_size": "Space saved",
+      "size": "Size",
+      "total_size": "Total size"
+    },
+    "info": "Deleting duplicate pages will modify your files. Backup your files and use manual deletion before using automatic deletion.",
+    "matches_n": "No matches | 1 match | {count} matches",
+    "saved_size": "Saved {size}",
+    "title": "Duplicate pages",
+    "unknown_size": "Unknown size"
+  },
+  "duplicates": {
+    "file_hash": "File hash",
+    "size": "Size",
+    "title": "Duplicate Files",
+    "url": "URL"
+  },
   "enums": {
     "copy_mode": {
       "HARDLINK": "Hardlink/Copy Files",
       "MOVE": "Move Files"
+    },
+    "historical_event_type": {
+      "BookConverted": "Book converted",
+      "BookFileDeleted": "Book file deleted",
+      "BookImported": "Book imported",
+      "DuplicatePageDeleted": "Duplicate page deleted",
+      "SeriesFolderDeleted": "Series folder deleted"
     },
     "media_status": {
       "ERROR": "Error",
@@ -498,6 +586,11 @@
       "READY": "Ready",
       "UNKNOWN": "Unknown",
       "UNSUPPORTED": "Unsupported"
+    },
+    "page_hash_action": {
+      "DELETE_AUTO": "Auto delete",
+      "DELETE_MANUAL": "Manual delete",
+      "IGNORE": "Ignore"
     },
     "reading_direction": {
       "LEFT_TO_RIGHT": "Left to right",
@@ -550,6 +643,7 @@
   "filter": {
     "age_rating": "age rating",
     "age_rating_none": "None",
+    "complete": "Complete",
     "genre": "genre",
     "in_progress": "In Progress",
     "language": "language",
@@ -564,6 +658,16 @@
   "filter_drawer": {
     "filter": "filter",
     "sort": "sort"
+  },
+  "history": {
+    "header": {
+      "book": "Book",
+      "date": "Date",
+      "details": "Details",
+      "series": "Series",
+      "type": "Type"
+    },
+    "title": "History"
   },
   "home": {
     "theme": "Theme",
@@ -589,6 +693,9 @@
     "status": "Status",
     "url": "URL"
   },
+  "media_management": {
+    "title": "Media Management"
+  },
   "menu": {
     "add_to_collection": "Add to collection",
     "add_to_readlist": "Add to read list",
@@ -606,6 +713,15 @@
     "refresh_metadata": "Refresh metadata",
     "scan_library_files": "Scan library files",
     "select_all": "Select all"
+  },
+  "metrics": {
+    "library_books": "Books per library",
+    "library_disk_space": "Library disk space",
+    "library_series": "Series per library",
+    "library_sidecars": "Sidecars per library",
+    "tasks_executed": "Tasks executed",
+    "tasks_total_time": "Tasks total time",
+    "title": "Metrics"
   },
   "navigation": {
     "home": "Home",
@@ -652,7 +768,7 @@
   },
   "settings_user": {
     "change_password": "Change password",
-    "edit_shared_libraries": "Edit shared libraries",
+    "edit_restrictions": "Edit restrictions",
     "edit_user": "Edit user",
     "latest_activity": "Latest activity: {date}",
     "no_recent_activity": "No recent activity",
@@ -677,6 +793,7 @@
   },
   "thumbnail_card": {
     "tooltip_delete": "Delete",
+    "tooltip_generated": "Generated artwork",
     "tooltip_mark_as_selected": "Mark as selected",
     "tooltip_selected": "Selected",
     "tooltip_sidecar": "Local artwork",
@@ -694,6 +811,9 @@
   "users": {
     "authentication_activity": "Authentication Activity",
     "users": "Users"
+  },
+  "validation": {
+    "zero_or_more": "Must be 0 or more"
   },
   "welcome": {
     "add_library": "Add library",
